@@ -243,7 +243,7 @@ void getStick(SDL_GameController *controller, controllerStick stick, uint8_t *xO
 
 void pollController(device *dev, SDL_GameController *controller) {
 	if (SDL_GameControllerGetAttached(controller)) {
-		printf("Polling controller \"%s\"\n", SDL_GameControllerName(controller));
+		//printf("Polling controller \"%s\"\n", SDL_GameControllerName(controller));
 
 		dev->isValid = 1;
 		dev->isPluggedIn = 1;
@@ -591,8 +591,10 @@ void __cdecl processController(device *dev) {
 	//}
 
 	// TODO: maybe smart selection of active controller?
-	for (int i = 0; i < controllerCount; i++) {
-		pollController(dev, controllerList[i]);
+	if (dev->port == 0) {
+		for (int i = 0; i < controllerCount; i++) {
+			pollController(dev, controllerList[i]);
+		}
 	}
 
 	dev->controlData[2] = ~dev->controlData[2];

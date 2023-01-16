@@ -66,7 +66,7 @@ void patchNoMovie() {
 	patchNop(0x004079a8, 0x004079f4 + 5 - 0x004079a8);
 }
 
-void ledgeWarpFix() {
+/*void ledgeWarpFix() {
 	// clamp st(0) to [-1, 1]
 	// replaces acos call, so we call that at the end
 	__asm {
@@ -94,10 +94,244 @@ void ledgeWarpFix() {
 	}
 
 	callFunc(0x00577cd7);
+}*/
+
+double ledgeWarpFix(double n) {
+	//printf("DOING LEDGE WARP FIX\n");
+	//double (__cdecl *orig_acos)(double) = (void *)0x00574ad0;
+
+	__asm {
+		sub esp,0x08
+		fst qword ptr [esp - 0x08]
+
+		ftst
+		jl negative
+		fld1
+		fcom
+		fstp st(0)
+		jle end
+		fstp st(0)
+		fld1
+		jmp end
+	negative:
+		fchs
+		fld1
+		fcom
+		fstp st(0)
+		fchs
+		jle end
+		fstp st(0)
+		fld1
+		fchs
+	end:
+		
+		add esp,0x08
+
+	}
+
+	callFunc(0x00574ad0);
+
+	//return orig_acos(n);
 }
 
 void patchLedgeWarp() {
-	patchCall(0x0049f1dc, ledgeWarpFix);
+	patchCall(0x004bc32b, ledgeWarpFix);
+}
+
+void __fastcall do_ground_friction(void *skater) {
+	//printf("DOING FRICTION FIX\n");
+
+	uint8_t (__fastcall *handle_slope)(void *) = (void *)0x004ba620;
+	void (__cdecl *apply_friction)(float *, float, float) = (void *)0x004bb5f0;
+
+	if (!*(int *)(0x0059b680)) {
+		*(int *)(0x00aab48c) = 1;
+	}
+
+	/*float *vel = *(int *)((int)skater + 0x634) + 0x30;
+	float length = sqrtf((vel[0] * vel[0]) + (vel[1] * vel[1]) + (vel[2] * vel[2]));
+	float friction = *(float *)((int)skater + 0x37b4);
+	float origFriction = *(float *)(*(int *)((int)skater + 0x634) + 0xe0) * 60.0;
+	float correctedFriction = *(float *)(*(int *)((int)skater + 0x634) + 0xe0) * *(float *)(*(int *)((int)skater + 0x634) + 0x38) * 60.0;
+	float frametime = *(float *)(*(int *)((int)skater + 0x634) + 0x38);
+	float unk = *(float *)(*(int *)((int)skater + 0x634) + 0xe0);
+	float calcFriction = friction * (1.0 / 60.0) * 60.0 / length;
+
+	printf("ORIG: %f CORRECTED: %f FRAMETIME: %f UNK: %f FRICTION: %f LENGTH: %f CALCFRICTION: %f\n", origFriction, correctedFriction, frametime, unk, friction, length, calcFriction);*/
+
+	if (!handle_slope(skater)) {
+		// do the calculation in double to avoid precision issues
+		float *vel = *(int *)((int)skater + 0x634) + 0x30;
+		double frictionVector[4];
+		for (int i = 0; i < 4; i++) {
+			frictionVector[i] = vel[i];
+		}
+
+		double length = sqrtf((frictionVector[0] * frictionVector[0]) + (frictionVector[1] * frictionVector[1]) + (frictionVector[2] * frictionVector[2]));
+
+		if (length < 0.0001) {
+			vel[0] = 0.0;
+			vel[1] = 0.0;
+			vel[2] = 0.0;
+			vel[3] = 0.0;
+
+			return;
+		}
+
+		double friction = *(float *)((int)skater + 0x37b4);
+		double frametime = *(float *)(*(int *)((int)skater + 0x634) + 0xe0);
+
+		double calcFriction = (friction * frametime * 60.0) / length;
+
+		frictionVector[0] *= calcFriction;
+		frictionVector[1] *= calcFriction;
+		frictionVector[2] *= calcFriction;
+		frictionVector[3] *= calcFriction;
+
+		double frictionD = (frictionVector[0] * frictionVector[0]) + (frictionVector[1] * frictionVector[1]) + (frictionVector[2] * frictionVector[2]);
+
+		if (frictionD > length * length) {
+			vel[0] = 0.0;
+			vel[1] = 0.0;
+			vel[2] = 0.0;
+			vel[3] = 0.0;
+
+			return;
+		} else {
+			double velocityDouble[4];
+			for (int i = 0; i < 4; i++) {
+				velocityDouble[i] = vel[i];
+			}
+
+			velocityDouble[0] -= frictionVector[0];
+			velocityDouble[1] -= frictionVector[1];
+			velocityDouble[2] -= frictionVector[2];
+			velocityDouble[3] -= frictionVector[3];
+
+			vel[0] = velocityDouble[0];
+			vel[1] = velocityDouble[1];
+			vel[2] = velocityDouble[2];
+			vel[3] = velocityDouble[3];
+		}
+	}
+}
+
+void apply_air_friction(void *skater, float friction) {
+	float *vel = *(int *)((int)skater + 0x634) + 0x30;
+
+	double velD = (vel[0] * vel[0]) + (vel[1] * vel[1]) + (vel[2] * vel[2]);
+	if (velD < 0.00001f) {
+		return;
+	}
+
+	double frictionVector[4];
+	for (int i = 0; i < 4; i++) {
+		frictionVector[i] = vel[i];
+	}
+
+	double frametime = *(float *)(*(int *)((int)skater + 0x634) + 0xe0);
+	double scale = friction * frametime * 60.0 * velD;
+
+	double len = sqrtf((frictionVector[0] * frictionVector[0]) + (frictionVector[1] * frictionVector[1]) + (frictionVector[2] * frictionVector[2]));
+
+	len = scale / len;
+
+	frictionVector[0] *= len;
+	frictionVector[1] *= len;
+	frictionVector[2] *= len;
+
+	double frictionD = (frictionVector[0] * frictionVector[0]) + (frictionVector[1] * frictionVector[1]) + (frictionVector[2] * frictionVector[2]);
+	if (frictionD > velD) {
+		vel[0] = 0.0;
+		vel[1] = 0.0;
+		vel[2] = 0.0;
+		vel[3] = 0.0;
+	} else {
+		double velocityDouble[4];
+		for (int i = 0; i < 4; i++) {
+			velocityDouble[i] = vel[i];
+		}
+
+		velocityDouble[0] -= frictionVector[0];
+		velocityDouble[1] -= frictionVector[1];
+		velocityDouble[2] -= frictionVector[2];
+		velocityDouble[3] -= frictionVector[3];
+
+		vel[0] = velocityDouble[0];
+		vel[1] = velocityDouble[1];
+		vel[2] = velocityDouble[2];
+		vel[3] = velocityDouble[3];
+	}
+}
+
+float getScriptFloat(uint32_t sum, int def) {
+	float (__fastcall *getFloat)(uint32_t, int) = (void *)0x00419610;
+	float result;
+
+	__asm {
+		push def
+		push sum
+		call getFloat
+		fstp result
+	}
+
+	return result;
+}
+
+void __fastcall do_air_friction(void *skater) {
+	float (__fastcall *getFloat)(uint32_t) = (void *)0x00419610;
+
+	float crouch_friction = getScriptFloat(0xbed96eda, 0);
+	float stand_friction = getScriptFloat(0x1a78b6fc, 0);
+
+	float friction_override_time = *(float *)((int)skater + 0x337c);
+	if (friction_override_time != 0.0f) {
+		crouch_friction = *(float *)((int)skater + 0x3388);	// friction override value
+		stand_friction = crouch_friction;
+	}
+
+	uint8_t crouching = *(uint8_t *)((int)skater + 0x33dc);
+	if (crouching) {
+		apply_air_friction(skater, crouch_friction);
+	} else {
+		apply_air_friction(skater, stand_friction);
+	}
+}
+
+void __fastcall speed_limiter(void *skater) {
+	float (__fastcall *getFloat)(uint32_t) = (void *)0x00419610;
+	float friction = getScriptFloat(0x850eb87a, 0);
+
+	apply_air_friction(skater, friction);
+}
+
+void get_fake_timer() {
+	double time = 1.0 / 240.0;	// 1/60
+	__asm {
+		fld time
+	}
+}
+
+void patchTimer() {
+	patchCall(0x00543d70, get_fake_timer);
+	patchByte(0x00543d70+5, 0xc3);
+}
+
+void patchFriction() {
+	//patchTimer();
+	//patchCall(0x004c9946, get_fake_timer);
+
+	patchCall(0x004c0131, do_air_friction);
+	patchCall(0x004c0138, do_ground_friction);
+
+	// speed limiter
+	patchNop(0x004bb0df, 174);
+	patchByte(0x004bb0df, 0x89);
+	patchByte(0x004bb0df + 1, 0xf1);
+	patchCall(0x004bb0df + 2, speed_limiter);
+
+	
+	//patchNop(0x004c0138, 5);
 }
 
 // fixed rendering function for the opaque side of the rendering pipeline
@@ -248,7 +482,8 @@ __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, L
 			//patchWindow();
 			//patchNoLauncher();
 			//patchIntroMovie();
-			//patchLedgeWarp();
+			patchLedgeWarp();
+			patchFriction();
 			//patchCullModeFix();
 			patchByte(0x0043f021, 0x1d);	// crappy window hack
 			//patchNop(0x0043f037, 6);
