@@ -12,43 +12,35 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_syswm.h>
 
-int *resX = 0x00851084;
-int *resY = 0x00851088;
-int *bitDepth = 0x0085108c;
+uint8_t isWindowed = 0;
+uint8_t *isFullscreen = 0x00858da7;
+uint32_t *resolution_setting_x = 0x005a0280;
+uint32_t *resolution_setting_y = 0x005a0284;
+uint32_t *antialiasing = 0x00aab494;
+uint32_t *hq_shadows = 0x00aab498;
+uint32_t *fog = 0x00aab490;
+HWND *hwnd = 0x00aab47c;
 
-uint8_t *highBandwidth = 0x005b4e75;
-uint8_t *shadows = 0x005b4e76;
-uint8_t *particles = 0x005b4e77;
-uint8_t *animatingTextures = 0x005b4e78;
-uint8_t *playIntro = 0x005b4e79;
-uint8_t *customSettings = 0x008510b1;
-uint8_t *distanceFog = 0x008510b2;
-uint8_t *lowDetailModels = 0x008510b3;
-uint8_t *frameCap = 0x008510b4;
-
-uint8_t *isWindowed = 0x008510a9;
-HWND *windowHandle = 0x0085109c;
-
-float *aspectRatio1 = 0x0058eb14;
-float *aspectRatio2 = 0x0058d96c;
+uint8_t resbuffer[100000];	// buffer needed for high resolutions
 
 uint8_t borderless;
+
+typedef struct {
+	uint32_t antialiasing;
+	uint32_t hq_shadows;
+	uint32_t fog;
+} graphicsSettings;
+
+int resX;
+int resY;
+float aspect_ratio;
+graphicsSettings graphics_settings;
 
 SDL_Window *window;
 
 void dumpSettings() {
-	printf("RESOLUTION X: %d\n", *resX);
-	printf("RESOLUTION Y: %d\n", *resY);
-	printf("BIT DEPTH: %d\n", *bitDepth);
-	printf("HIGH BANDWIDTH: %02x\n", *highBandwidth);
-	printf("PLAY INTRO: %02x\n", *playIntro);
-	printf("CUSTOM SETTINGS: %02x\n", *customSettings);
-	printf("ANIMATING TEXTURES: %02x\n", *animatingTextures);
-	printf("SHADOWS: %02x\n", *shadows);
-	printf("PARTICLES: %02x\n", *particles);
-	printf("DISTANCE FOG: %02x\n", *distanceFog);
-	printf("LOW DETAIL MODELS: %02x\n", *lowDetailModels);
-	printf("LOCK TO 60HZ: %02x\n", *frameCap);
+	printf("RESOLUTION X: %d\n", resX);
+	printf("RESOLUTION Y: %d\n", resY);
 }
 
 void enforceMaxResolution() {
@@ -58,10 +50,10 @@ void enforceMaxResolution() {
 	uint8_t isValidY = 0;
 
 	while (EnumDisplaySettings(NULL, i, &deviceMode)) {
-		if (deviceMode.dmPelsWidth >= *resX) {
+		if (deviceMode.dmPelsWidth >= resX) {
 			isValidX = 1;
 		}
-		if (deviceMode.dmPelsHeight >= *resY) {
+		if (deviceMode.dmPelsHeight >= resY) {
 			isValidY = 1;
 		}
 
@@ -69,76 +61,114 @@ void enforceMaxResolution() {
 	}
 
 	if (!isValidX || !isValidY) {
-		*resX = 0;
-		*resY = 0;
+		resX = 0;
+		resY = 0;
 	}
 }
 
-HWND getOrCreateWindow() {
-	if (!(*windowHandle)) {
-		SDL_Init(SDL_INIT_VIDEO);
+void loadSettings();
 
-		SDL_WindowFlags flags = *isWindowed ? SDL_WINDOW_SHOWN : SDL_WINDOW_FULLSCREEN;
+void createSDLWindow() {
+	loadSettings();
 
-		if (borderless && *isWindowed) {
-			flags |= SDL_WINDOW_BORDERLESS;
-		}
+	SDL_Init(SDL_INIT_VIDEO);
+	//isWindowed = 1;
 
-		enforceMaxResolution();
+	SDL_WindowFlags flags = isWindowed ? SDL_WINDOW_SHOWN : SDL_WINDOW_FULLSCREEN;
 
-		if (*resX == 0 || *resY == 0) {
-			SDL_DisplayMode displayMode;
-			SDL_GetDesktopDisplayMode(0, &displayMode);
-			*resX = displayMode.w;
-			*resY = displayMode.h;
-		}
-		
-		if (*resX < 640) {
-			*resX = 640;
-		}
-		if (*resY < 480) {
-			*resY = 480;
-		}
-
-		window = SDL_CreateWindow("THPS3 - PARTYMOD", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, *resX, *resY, flags);   // TODO: fullscreen
-
-		if (!window) {
-			printf("Failed to create window! Error: %s\n", SDL_GetError());
-		}
-
-		SDL_SysWMinfo wmInfo;
-		SDL_VERSION(&wmInfo.version);
-		SDL_GetWindowWMInfo(window, &wmInfo);
-		*windowHandle = wmInfo.info.win.window;
+	if (borderless && isWindowed) {
+		flags |= SDL_WINDOW_BORDERLESS;
 	}
 
-	return *windowHandle;
+	//*isFullscreen = !isWindowed;
+
+	enforceMaxResolution();
+
+	if (resX == 0 || resY == 0) {
+		SDL_DisplayMode displayMode;
+		SDL_GetDesktopDisplayMode(0, &displayMode);
+		resX = displayMode.w;
+		resY = displayMode.h;
+	}
+		
+	if (resX < 640) {
+		resX = 640;
+	}
+	if (resY < 480) {
+		resY = 480;
+	}
+
+	*resolution_setting_x = resX;
+	*resolution_setting_y = resY;
+
+	window = SDL_CreateWindow("THPS4 - PARTYMOD", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, resX, resY, flags);   // TODO: fullscreen
+
+	if (!window) {
+		printf("Failed to create window! Error: %s\n", SDL_GetError());
+	}
+
+	SDL_SysWMinfo wmInfo;
+	SDL_VERSION(&wmInfo.version);
+	SDL_GetWindowWMInfo(window, &wmInfo);
+	*hwnd = wmInfo.info.win.window;
+
+	int *isFocused = 0x005a027c;
+	//int *other_isFocused = 0x0072e850;
+	*isFocused = 1;
+
+	if (isWindowed) {
+		patchByte(0x0043f020 + 1, 0x1d);	// set windowed to 1
+		patchDWord(0x0043f05c + 6, 0);	// set swap interval to default	(0)
+	}
+
+	// patch resolution setting
+	//patchDWord(0x0043f089 + 4, resX);
+	//patchDWord(0x0043f0d5 + 2, resX);
+	//patchDWord(0x0043f082 + 1, resY);
+
+	patchNop(0x0043f0f0, 15);
+	patchNop(0x0043f136, 8);
+	patchNop(0x0043f187, 12);
+	patchNop(0x0043f19e, 10);
+	
+	SDL_ShowCursor(0);
+}
+
+void writeConfigValues() {
+	*antialiasing = graphics_settings.antialiasing;
+	*hq_shadows = graphics_settings.hq_shadows;
+	*fog = graphics_settings.fog;
+	printf("Distance fog = %d\n", *fog);
+}
+
+float __cdecl getScreenAngleFactor() {
+	return ((float)resX / (float)resY) / (4.0f / 3.0f);
+}
+
+float *screenAspectRatio = 0x00ab4b38;
+void __cdecl setAspectRatio(float aspect) {
+	*screenAspectRatio = (float)resX / (float)resY;
 }
 
 void patchWindow() {
 	// replace the window with an SDL2 window.  this kind of straddles the line between input and config
-	//DWORD style = WS_CAPTION | WS_ICONIC | WS_CLIPCHILDREN | WS_SYSMENU | WS_MINIMIZEBOX | WS_VISIBLE | WS_BORDER;
+	patchNop(0x005319ab, 168);
+	patchCall(0x005319ab + 5, createSDLWindow);
 
-	//patchDWord((void *)0x00409d55, style);
-	//patchDWord((void *)0x00409df4, style);
-	patchCall((void *)0x00409be0, getOrCreateWindow);
-	patchByte((void *)(0x00409be0 + 5), 0xC3);  // RET
+	patchNop(0x00531a84, 2);
+	//patchByte(0x006b3290 + 5, 0xc3);
+	
+	//patchDWord(0x0050d025 + 1, &resbuffer);
 
-	// always say the game is windowed
-	patchNop((void *)0x00409f70, 10);
-	patchInst((void *)0x00409f70, MOVIMM8);
-	patchByte((void *)(0x00409f70 + 1), 0x01);
+	//patchNop(0x005352b3, 14);	// don't move window to corner
 
-	// make the game hide the cursor when it thinks its windowed
-	patchByte((void *)0x004075e5, 0x74);    // JNZ -> JZ
-	patchByte((void *)0x0040773b, 0x74);    // JNZ -> JZ
-	patchByte((void *)0x00425f42, 0x74);    // JNZ -> JZ
-	patchByte((void *)0x00449e6f, 0x74);    // JNZ -> JZ
+	patchCall(0x005430ba, writeConfigValues);	// don't load config, use our own
 
-	// remove sleep from main loop
-	patchNop((void *)0x004c05eb, 2);
-	patchNop((void *)0x004c067a, 8);
-	//patchByte((void *)(0x004c067a + 1), 0x01);
+	patchCall(0x00470320, setAspectRatio);
+	patchByte(0x00470320, 0xe9);	// change CALL to JMP
+
+	patchCall(0x00470430, getScreenAngleFactor);
+	patchByte(0x00470430, 0xe9);	// change CALL to JMP
 }
 
 #define GRAPHICS_SECTION "Graphics"
@@ -158,51 +188,41 @@ void loadSettings() {
 	char configFile[1024];
 	sprintf(configFile, "%s%s", executableDirectory, CONFIG_FILE_NAME);
 
-	//GetPrivateProfileString("Game", "HighBandwidth", "", )
-	*highBandwidth = 1;	// it's 2022, very few people are probably on dial up, and probably generally not gaming
-	*playIntro = getIniBool("Miscellaneous", "PlayIntro", 1, configFile);
-
-	*animatingTextures = getIniBool("Graphics", "AnimatedTextures", 1, configFile);
-	*particles = getIniBool("Graphics", "Particles", 1, configFile);
-	*shadows = getIniBool("Graphics", "Shadows", 1, configFile);
-	*distanceFog = getIniBool("Graphics", "DistanceFog", 0, configFile);
-	*lowDetailModels = getIniBool("Graphics", "LowDetailModels", 0, configFile);
+	graphics_settings.antialiasing = getIniBool("Graphics", "AntiAliasing", 0, configFile);
+	graphics_settings.hq_shadows = getIniBool("Graphics", "HQShadows", 0, configFile);
+	graphics_settings.fog = getIniBool("Graphics", "DistanceFog", 0, configFile);
+	printf("Distance fog = %d\n", graphics_settings.fog);
    
-	*resX = GetPrivateProfileInt("Graphics", "ResolutionX", 640, configFile);
-	*resY = GetPrivateProfileInt("Graphics", "ResolutionY", 480, configFile);
-	if (!*isWindowed) {
-		*isWindowed = getIniBool("Graphics", "Windowed", 0, configFile);
+	resX = GetPrivateProfileInt("Graphics", "ResolutionX", 640, configFile);
+	resY = GetPrivateProfileInt("Graphics", "ResolutionY", 480, configFile);
+	if (!isWindowed) {
+		isWindowed = getIniBool("Graphics", "Windowed", 0, configFile);
 	}
 	borderless = getIniBool("Graphics", "Borderless", 0, configFile);
-
-	*customSettings = 1;    // not useful
-	*frameCap = 1;  // not useful...maybe
-	*bitDepth = 32;	// forcing this to 32 as it's 2022
-
-	float aspectRatio = ((float)*resX) / ((float)*resY);
-	patchFloat(0x0058eb14, aspectRatio);
-	patchFloat(0x0058d96c, aspectRatio);
-
-	// shadows - i'm not fully sure how this works, but in theory you can increase shadow resolution here
-	//patchFloat(0x00501289 + 4, 100.0f);
-	//patchFloat(0x00501291 + 4, 100.0f);
-	//patchFloat(0x005012a4 + 4, 128.0f);
-	//patchFloat(0x005012ac + 4, 128.0f);
 }
-
-//char *keyFmtStr = "menu=%d\0cameraToggle=%d\0cameraSwivelLock=%d\0grind=%d\0grab=%d\0ollie=%d\0kick=%d\0spinLeft=%d\0spinRight=%d\0nollie=%d\0switch=%d\0left=%d\0right=%d\0up=%d\0down=%d\0"
 
 #define KEYBIND_SECTION "Keybinds"
 #define CONTROLLER_SECTION "Gamepad"
+
+void loadInputSettings(struct inputsettings *settingsOut) {
+	char configFile[1024];
+	sprintf(configFile, "%s%s", executableDirectory, CONFIG_FILE_NAME);
+
+	if (settingsOut) {
+		//settingsOut->isPs2Controls = getIniBool("Miscellaneous", "UsePS2Controls", 1, configFile);
+	}
+}
 
 void loadKeyBinds(struct keybinds *bindsOut) {
 	char configFile[1024];
 	sprintf(configFile, "%s%s", executableDirectory, CONFIG_FILE_NAME);
 
 	if (bindsOut) {
-		bindsOut->menu = GetPrivateProfileInt(KEYBIND_SECTION, "Pause", 0, configFile);
-		bindsOut->cameraToggle = GetPrivateProfileInt(KEYBIND_SECTION, "ViewToggle", SDL_SCANCODE_GRAVE, configFile);
-		bindsOut->cameraSwivelLock = GetPrivateProfileInt(KEYBIND_SECTION, "SwivelLock", 0, configFile);
+		bindsOut->menu = GetPrivateProfileInt(KEYBIND_SECTION, "Pause", SDL_SCANCODE_RETURN, configFile);
+		bindsOut->cameraToggle = GetPrivateProfileInt(KEYBIND_SECTION, "ViewToggle", SDL_SCANCODE_F, configFile);
+		bindsOut->cameraSwivelLock = GetPrivateProfileInt(KEYBIND_SECTION, "SwivelLock", SDL_SCANCODE_GRAVE, configFile);
+		//bindsOut->focus = GetPrivateProfileInt(CONTROLLER_SECTION, "Focus", SDL_SCANCODE_KP_ENTER, configFile);
+		//bindsOut->caveman = GetPrivateProfileInt(CONTROLLER_SECTION, "Caveman", SDL_SCANCODE_E, configFile);
 
 		bindsOut->grind = GetPrivateProfileInt(KEYBIND_SECTION, "Grind", SDL_SCANCODE_KP_8, configFile);
 		bindsOut->grab = GetPrivateProfileInt(KEYBIND_SECTION, "Grab", SDL_SCANCODE_KP_6, configFile);
@@ -234,6 +254,8 @@ void loadControllerBinds(struct controllerbinds *bindsOut) {
 		bindsOut->menu = GetPrivateProfileInt(CONTROLLER_SECTION, "Pause", CONTROLLER_BUTTON_START, configFile);
 		bindsOut->cameraToggle = GetPrivateProfileInt(CONTROLLER_SECTION, "ViewToggle", CONTROLLER_BUTTON_BACK, configFile);
 		bindsOut->cameraSwivelLock = GetPrivateProfileInt(CONTROLLER_SECTION, "SwivelLock", CONTROLLER_BUTTON_RIGHTSTICK, configFile);
+		//bindsOut->focus = GetPrivateProfileInt(CONTROLLER_SECTION, "Focus", CONTROLLER_BUTTON_LEFTSTICK, configFile);
+		//bindsOut->caveman = GetPrivateProfileInt(CONTROLLER_SECTION, "Caveman", 0, configFile);
 
 		bindsOut->grind = GetPrivateProfileInt(CONTROLLER_SECTION, "Grind", CONTROLLER_BUTTON_Y, configFile);
 		bindsOut->grab = GetPrivateProfileInt(CONTROLLER_SECTION, "Grab", CONTROLLER_BUTTON_B, configFile);

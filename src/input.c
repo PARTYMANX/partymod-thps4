@@ -8,146 +8,82 @@
 #include <global.h>
 #include <patch.h>
 #include <config.h>
+#include <script.h>
 
-// Lookup table that translates from SDL Scancodes to Microsoft Virtual Keys
-uint8_t vkeyLUT[285] = {
-	0x00, 0x00, 0x00, 0x00, 0x41, 0x42, 0x43, 0x44, // 0, 0, 0, 0, A, B, C, D - 8
-	0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, // E, F, G, H, I, J, K, L - 16
-	0x4d, 0x4e, 0x4f, 0x50, 0x51, 0x52, 0x53, 0x54, // M, N, O, P, Q, R, S, T - 24
-	0x55, 0x56, 0x57, 0x58, 0x59, 0x5a, 0x31, 0x32, // U, V, W, X, Y, Z, 1, 2 - 32
-	0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30, // 3, 4, 5, 6, 7, 8, 9, 0 - 40
-	VK_RETURN, VK_ESCAPE, VK_BACK, VK_TAB, VK_SPACE, VK_OEM_MINUS, VK_OEM_PLUS, VK_OEM_4, // RETURN, ESCAPE, BACKSPACE, TAB, SPACE, MINUS, EQUALS, L BRACKET - 48
-	VK_OEM_6, VK_OEM_5, 0x00, VK_OEM_1, VK_OEM_7, VK_OEM_3, VK_OEM_COMMA, VK_OEM_PERIOD, // R BRACKET, BACKSLASH, NONUSLASH, SEMICOLON, APOSTROPHE, GRAVE, COMMA, PERIOD - 56
-	VK_OEM_2, VK_CAPITAL, VK_F1, VK_F2, VK_F3, VK_F4, VK_F5, VK_F6, // SLASH, CAPSLOCK, F1, F2, F3, F4, F5, F6 - 64
-	VK_F7, VK_F8, VK_F9, VK_F10, VK_F11, VK_F12, VK_PRINT, VK_SCROLL, // F7, F8, F9, F10, F11, F12, PRINT SCREEN, SCROLL LOCK - 72
-	VK_PAUSE, VK_INSERT, VK_HOME, VK_PRIOR, VK_DELETE, VK_END, VK_NEXT, VK_RIGHT, // PAUSE, INSERT, HOME, PAGEUP, DELETE, END, PAGEDOWN, RIGHT - 80
-	VK_LEFT, VK_DOWN, VK_UP, VK_NUMLOCK, VK_DIVIDE, VK_MULTIPLY, VK_SUBTRACT, VK_ADD, // LEFT, DOWN, UP, NUMLOCKCLEAR, KP DIVIDE, KP MULTIPLY, KP MINUS, KP PLUS - 88
-	VK_RETURN, VK_NUMPAD1, VK_NUMPAD2, VK_NUMPAD3, VK_NUMPAD4, VK_NUMPAD5, VK_NUMPAD6, VK_NUMPAD7, // KP ENTER, KP 1, KP 2, KP 3, KP 4, KP 5, KP 6, KP 7 - 96
-	VK_NUMPAD8, VK_NUMPAD9, VK_NUMPAD0, 0x00, 0x00, 0x00, 0x00, 0x00, // KP 8, KP 9, KP 0, KP PERIOD, NONUSBACKSLASH, APPLICATION, POWER, KP EQUALS - 104
-	VK_F13, VK_F14, VK_F15, VK_F16, VK_F17, VK_F18, VK_F19, VK_F20, // F13, F14, F15, F16, F17, F18, F19, F20 - 112
-	VK_F21, VK_F22, VK_F23, VK_F24, VK_EXECUTE, VK_HELP, 0x00, VK_SELECT, // F21, F22, F23, F24, EXECUTE, HELP, MENU, SELECT - 120
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // STOP, AGAIN, UNDO, CUT, COPY, PASTE, FIND, MUTE - 128
-	VK_VOLUME_UP, VK_VOLUME_DOWN, 0x00, 0x00, 0x00, VK_OEM_COMMA, 0x00, 0x00, // VOL UP, VOL DOWN, 0, 0, 0, KP COMMA, KP EQUALS AS400, INTERNATIONAL 1 - 136
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // INTERNATIONAL 2, INTERNATIONAL 3, INTERNATIONAL 4, INTERNATIONAL 5, INTERNATIONAL 6, INTERNATIONAL 7, INTERNATIONAL 8, INTERNATIONAL 9 - 144
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // LANG 1, LANG 2, LANG 3, LANG 4, LANG 5, LANG 6, LANG 7, LANG 8 - 152
-	0x00, 0x00, 0x00, VK_CANCEL, VK_CLEAR, VK_PRIOR, 0x00, VK_SEPARATOR, // LANG 9, ALTERASE, SYSREQ, CANCEL, CLEAR, PRIOR, RETURN2, SEPARATOR - 160
-	0x00, 0x00, 0x00, VK_CRSEL, VK_EXSEL, 0x00, 0x00, 0x00, // OUT, OPER, CLEARAGAIN, CRSEL, EXSEL, 0, 0, 0 - 168
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 0, 0, 0, 0, 0, 0, 0, 0 - 176
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // KP 00, KP 000, THOUSANDS SEPARATOR, DECIMAL SEPARATOR, CURRENCY UNIT, CURRENCY SUBUNIT, KP L PAREN, KP R PAREN - 184
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // KP L BRACE, KP R BRACE, KP TAB, KP BACKSPACE, KP A, KP B, KP C, KP D - 192
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // KP E, KP F, KP XOR, KP POWER, KP PERCENT, KP LESS, KP GREATER, KP AMPERSAND - 200
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // KP DBL AMPERSAND, KP VERTICAL BAR, KP DBL VERTICAL BAR, KP COLON, KP HASH, KP SPACE, KP AT, KP EXCLAM - 208
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // KP MEM STORE, KP MEM RECALL, KP MEM CLEAR, KP MEM ADD, KP MEM SUBTRACT, KP MEM MULTIPLY, KP MEM DIVIDE, KP PLUS MINUS - 216
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // KP CLEAR, KP CLEAR ENTRY, KP BINARY, KP OCTAL, KP DECIMAL, KP HEXADECIMAL, 0, 0 - 224
-	VK_LCONTROL, VK_LSHIFT, VK_LMENU, VK_LWIN, VK_RCONTROL, VK_RSHIFT, VK_RMENU, VK_RWIN, // L CTRL, L SHIFT, L ALT, L GUI, R CTRL, R SHIFT, R ALT, R GUI - 232
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 0, 0, 0, 0, 0, 0, 0, 0 - 240
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 0, 0, 0, 0, 0, 0, 0, 0 - 248
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 0, 0, 0, 0, 0, 0, 0, 0 - 256
-	0x00, 0x00, VK_MEDIA_NEXT_TRACK, VK_MEDIA_PREV_TRACK, VK_MEDIA_STOP, VK_MEDIA_PLAY_PAUSE, VK_VOLUME_MUTE, VK_LAUNCH_MEDIA_SELECT, // 0, MODE, AUDIO NEXT, AUDIO PREV, AUDIO STOP, AUDIO PLAY, AUDIO MUTE, MEDIA SELECT
-	0x00, 0x00, 0x00, 0x00, VK_BROWSER_SEARCH, VK_BROWSER_HOME, VK_BROWSER_BACK, VK_BROWSER_FORWARD, // WWW, MAIL, CALCULATOR, COMPUTER, AC SEARCH, AC HOME, AC BACK, AC FORWARD
-	VK_BROWSER_STOP, VK_BROWSER_REFRESH, VK_BROWSER_FAVORITES, 0x00, 0x00, 0x00, 0x00, 0x00, // AC STOP, AC REFRESH, AC BOOKMARKS, BRIGHTNESS DOWN, BRIGHTNESS UP, DISPLAY SWITCH, KB DILLUM TOGGLE, KB DILLUM DOWN
-	0x00, 0x00, VK_SLEEP, VK_LAUNCH_APP1, 0x00 // KB DILLUM UP, EJECT, SLEEP, APP1, 0
-};
-
+// device is +0x100
 typedef struct {
 	uint32_t vtablePtr;
 	//uint32_t node;
 	uint32_t type;
 	uint32_t port;
-	uint32_t slot;
 	// 16
+	uint32_t slot;
 	uint32_t isValid;
 	uint32_t unk_24;
 	uint8_t controlData[32];	// PS2 format control data
-	uint32_t vibrationData_align[8];
-	uint32_t vibrationData_direct[8];
-	//uint32_t vibrationData_max[8];
-	//uint32_t vibrationData_oldDirect[8];    // there may be something before this
+	uint8_t vibrationData_align[32];
+	uint8_t vibrationData_direct[32];
+	uint8_t vibrationData_max[32];
+	uint8_t vibrationData_oldDirect[32];    // there may be something before this
 	// 160
 	// 176
 	//uint32_t unk4;
 	//uint32_t unk4;
 	//uint32_t unk4;
+	uint8_t unkChunk[100];
 	uint32_t unk5;
 	// 192
 	uint32_t unk6;
-	uint32_t unk7;
-	uint32_t unk8;
-	uint32_t unk9;
+	uint32_t actuatorsDisabled;	// +0x124
+	uint32_t capabilities;	// +0x128
+	uint32_t unk7;	// +0x12c
 	// 208
-	uint32_t unk10;
-	uint32_t state;
-	uint32_t nextState;
-	uint32_t index;
+	uint32_t num_actuators; // +0x130
+	uint32_t unk8;	// +0x134
+	uint32_t unk9;	// +0x138
+	uint32_t state;	// +0x13c
+	uint32_t test;	// +0x140
 	// 224
-	uint32_t isPluggedIn;
-	uint32_t deviceInterface;
-	uint32_t unk13;
-	uint16_t unk14;
+	uint32_t index;	// CORRECT HERE!!	+0x144
+	uint32_t isPluggedIn;	// +0x148
+	uint32_t unplugged_counter;
+	uint32_t unplugged_retry;
+
+	uint32_t pressed;
+	uint32_t start_or_a_pressed;
 	// 238
 } device;
 
-typedef struct {
-	uint32_t unk1;
-	uint32_t unk2;
-	uint32_t unk3;
-	uint32_t unk4;
-	//16
-	uint32_t unk5;
-	uint32_t unk6;
-	uint32_t unk7;
-	HINSTANCE hinstance;
-	//32
-	HWND hwnd;
-	uint32_t dinputInterface;
-} manager;
-
-int (__stdcall *menuOnScreen)() = (void *)0x0044a540;
+void patchPs2Buttons();
 
 int controllerCount;
 int controllerListSize;
-SDL_GameController **controllerList;    // does this need to be threadsafe?
+SDL_GameController **controllerList;
+//struct inputsettings inputsettings;
 struct keybinds keybinds;
 struct controllerbinds padbinds;
 
-uint8_t isCursorActive = 1;
 uint8_t isUsingKeyboard = 1;
+
+struct playerslot {
+	SDL_GameController *controller;
+	uint8_t lockedOut;	// after sign-in, a controller is "locked out" until all of its buttons are released
+};
+
+#define MAX_PLAYERS 2
+uint8_t numplayers = 0;
+struct playerslot players[MAX_PLAYERS] = { { NULL, 0 }, { NULL, 0 } };
 
 void setUsingKeyboard(uint8_t usingKeyboard) {
 	isUsingKeyboard = usingKeyboard;
-
-	if (isUsingKeyboard && isCursorActive) {
-		SDL_ShowCursor(SDL_ENABLE);
-	} else {
-		SDL_ShowCursor(SDL_DISABLE);
-	}
-}
-
-// this looks messy to have two functions for cursor hiding/showing, but it makes it easier to inject
-void setCursorActive() {
-	isCursorActive = 1;
-
-	if (isUsingKeyboard && isCursorActive) {
-		SDL_ShowCursor(SDL_ENABLE);
-	} else {
-		SDL_ShowCursor(SDL_DISABLE);
-	}
-}
-
-void setCursorInactive() {
-	isCursorActive = 0;
-
-	if (isUsingKeyboard && isCursorActive) {
-		SDL_ShowCursor(SDL_ENABLE);
-	} else {
-		SDL_ShowCursor(SDL_DISABLE);
-	}
 }
 
 void addController(int idx) {
 	printf("Detected controller \"%s\"\n", SDL_GameControllerNameForIndex(idx));
 
 	SDL_GameController *controller = SDL_GameControllerOpen(idx);
+
+	SDL_GameControllerSetPlayerIndex(controller, -1);
 
 	if (controller) {
 		if (controllerCount == controllerListSize) {
@@ -166,6 +102,47 @@ void addController(int idx) {
 	}
 }
 
+void addplayer(SDL_GameController *controller) {
+	if (numplayers < 2) {
+		// find open slot
+		uint8_t found = 0;
+		int i = 0;
+		for (; i < MAX_PLAYERS; i++) {
+			if (!players[i].controller) {
+				found = 1;
+				break;
+			}
+		}
+		if (found) {
+			SDL_GameControllerSetPlayerIndex(controller, i);
+			players[i].controller = controller;
+
+			if (numplayers > 0) {
+				players[i].lockedOut = 1;
+				SDL_JoystickRumble(SDL_GameControllerGetJoystick(controller), 0x7fff, 0x7fff, 250);
+			}
+			
+			numplayers++;
+
+			printf("Added player %d: %s\n", i + 1, SDL_GameControllerName(controller));
+		}
+	} else {
+		printf("Already two players, not adding\n");
+	}
+}
+
+void pruneplayers() {
+	for (int i = 0; i < MAX_PLAYERS; i++) {
+		if (players[i].controller && !SDL_GameControllerGetAttached(players[i].controller)) {
+			printf("Pruned player %d\n", i + 1);
+
+			players[i].controller = NULL;
+			numplayers--;
+			printf("Remaining players: %d\n", numplayers);
+		}
+	}
+}
+
 void removeController(SDL_GameController *controller) {
 	printf("Controller \"%s\" disconnected\n", SDL_GameControllerName(controller));
 
@@ -178,15 +155,23 @@ void removeController(SDL_GameController *controller) {
 	if (controllerList[i] == controller) {
 		SDL_GameControllerClose(controller);
 
+		int playerIdx = SDL_GameControllerGetPlayerIndex(controller);
+		if (playerIdx != -1) {
+			printf("Removed player %d\n", playerIdx + 1);
+			players[playerIdx].controller = NULL;
+			numplayers--;
+		}
+
+		pruneplayers();
+
 		for (; i < controllerCount - 1; i++) {
 			controllerList[i] = controllerList[i + 1];
 		}
 		controllerCount--;
 	} else {
+		//setActiveController(NULL);
 		printf("Did not find disconnected controller in list\n");
 	}
-
-	//Sleep(10000);
 }
 
 void initSDLControllers() {
@@ -243,8 +228,6 @@ void getStick(SDL_GameController *controller, controllerStick stick, uint8_t *xO
 
 void pollController(device *dev, SDL_GameController *controller) {
 	if (SDL_GameControllerGetAttached(controller)) {
-		//printf("Polling controller \"%s\"\n", SDL_GameControllerName(controller));
-
 		dev->isValid = 1;
 		dev->isPluggedIn = 1;
 
@@ -256,12 +239,11 @@ void pollController(device *dev, SDL_GameController *controller) {
 			dev->controlData[2] |= 0x01 << 0;
 		}
 		if (getButton(controller, padbinds.cameraSwivelLock)) {
-			dev->controlData[2] |= 0x01 << 1;
+			dev->controlData[2] |= 0x01 << 2;
 		}
-		// unused - right stick
-		//if (SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_RIGHTSTICK)) {
-		//	dev->controlData[2] |= 0x01 << 2;
-		//}
+		/*if (getButton(controller, padbinds.focus)) {
+			dev->controlData[2] |= 0x01 << 1;
+		}*/
 
 		if (getButton(controller, padbinds.grind)) {
 			dev->controlData[3] |= 0x01 << 4;
@@ -319,34 +301,25 @@ void pollController(device *dev, SDL_GameController *controller) {
 			dev->controlData[9] = 0xFF;
 		}
 
+		/*if (inputsettings.isPs2Controls) {
+			// big hack: bike backwards revert looks for white button specifically, so just bind that to the revert button when in ps2 mode as there are no side effects
+			if (getButton(controller, padbinds.switchRevert)) {
+				dev->controlData[20] |= 0x01 << 1;
+			} 
+		} else {
+			if (getButton(controller, padbinds.nollie)) {
+				dev->controlData[20] |= 0x01 << 1;
+			}
+
+			// caveman
+			if (getButton(controller, padbinds.switchRevert)) {
+				dev->controlData[20] |= 0x01 << 0;
+			}
+		}*/
+		
 		// sticks
 		getStick(controller, padbinds.camera, &(dev->controlData[4]), &(dev->controlData[5]));
 		getStick(controller, padbinds.movement, &(dev->controlData[6]), &(dev->controlData[7]));
-
-		// apply left stick direction to dpad buttons to allow for menu selections with stick
-		// this is safe because park editor does not poll the controller and nothing else separates stick and dpad
-		// TODO: check if in menu
-		/*if (menuOnScreen()) {
-				if (dev->controlData[6] < 64) {
-				// > 50% left input
-				dev->controlData[2] |= 0x01 << 7;
-				dev->controlData[9] = 0xFF;
-			} else if (dev->controlData[6] > (255 - 64)) {
-				// > 50% right input
-				dev->controlData[2] |= 0x01 << 5;
-				dev->controlData[8] = 0xFF;
-			}
-
-			if (dev->controlData[7] < 64) {
-				// > 50% up input
-				dev->controlData[2] |= 0x01 << 4;
-				dev->controlData[10] = 0xFF;
-			} else if (dev->controlData[7] > (255 - 64)) {
-				// > 50% down input
-				dev->controlData[2] |= 0x01 << 6;
-				dev->controlData[11] = 0xFF;
-			}
-		}*/
 	}
 }
 
@@ -363,9 +336,9 @@ void pollKeyboard(device *dev) {
 	if (keyboardState[keybinds.cameraToggle]) {
 		dev->controlData[2] |= 0x01 << 0;
 	}
-	if (0) {	// no control for left stick on keyboard
+	/*if (keyboardState[keybinds.focus]) {	// no control for left stick on keyboard
 		dev->controlData[2] |= 0x01 << 1;
-	}
+	}*/
 	if (keyboardState[keybinds.cameraSwivelLock]) {
 		dev->controlData[2] |= 0x01 << 2;
 	}
@@ -386,6 +359,22 @@ void pollKeyboard(device *dev) {
 		dev->controlData[3] |= 0x01 << 7;
 		dev->controlData[15] = 0xff;
 	}
+
+	/*if (inputsettings.isPs2Controls) {
+		// big hack: bike backwards revert looks for white button specifically, so just bind that to the revert button when in ps2 mode as there are no side effects
+		if (keyboardState[keybinds.switchRevert]) {
+			dev->controlData[20] |= 0x01 << 1;
+		} 
+	} else {
+		if (keyboardState[keybinds.nollie]) {
+			dev->controlData[20] |= 0x01 << 1;
+		}
+
+		// caveman
+		if (keyboardState[keybinds.switchRevert]) {
+			dev->controlData[20] |= 0x01 << 0;
+		}
+	}*/
 
 	// shoulders
 	if (keyboardState[keybinds.leftSpin]) {
@@ -460,22 +449,168 @@ void pollKeyboard(device *dev) {
 }
 
 // returns 1 if a text entry prompt is on-screen so that keybinds don't interfere with text entry confirmation/cancellation
-int isKeyboardTyping() {
-	void *(__stdcall *getMenuFactorySingleton)(int) = (void *)0x004d12a0;
-	void (*deleteMenuFactorySingleton)() = (void *)0x004d12f0;
-	
-	void *menuFactory = getMenuFactorySingleton(0);
+uint8_t isKeyboardTyping() {
+	//uint8_t *keyboard_on_screen = 0x00ab5bac;
 
-	int result = *(int *)(((uint8_t *)menuFactory) + 0x154);
-	
-	deleteMenuFactorySingleton();
+	//return *keyboard_on_screen;
+}
 
-	return result;
+void do_key_input(SDL_KeyCode key) {
+	void (*key_input)(int32_t key, uint32_t param) = (void *)0x005426c0;
+	uint8_t *keyboard_on_screen = 0x00ab5bac;
+
+	//if (!*keyboard_on_screen) {
+	//	return;
+	//}
+
+	int32_t key_out = 0;
+	uint8_t modstate = SDL_GetModState();
+	uint8_t shift = SDL_GetModState() & KMOD_SHIFT;
+	uint8_t caps = SDL_GetModState() & KMOD_CAPS;
+
+	if (key == SDLK_RETURN) {
+		key_out = 0x0d;	// CR
+	} else if (key == SDLK_BACKSPACE) {
+		key_out = 0x08;	// BS
+	} else if (key == SDLK_ESCAPE) {
+		key_out = 0x1b;	// ESC
+	} else if (key == SDLK_SPACE) {
+		key_out = ' ';
+	} else if (key >= SDLK_0 && key <= SDLK_9 && !(modstate & KMOD_SHIFT)) {
+		key_out = key;
+	} else if (key >= SDLK_a && key <= SDLK_z) {
+		key_out = key;
+		if (modstate & (KMOD_SHIFT | KMOD_CAPS)) {
+			key_out -= 0x20;
+		}
+	} else if (key == SDLK_PERIOD) {
+		if (modstate & KMOD_SHIFT) {
+			key_out = '>';
+		} else {
+			key_out = '.';
+		}
+	} else if (key == SDLK_COMMA) {
+		if (modstate & KMOD_SHIFT) {
+			key_out = '<';
+		} else {
+			key_out = ',';
+		}
+	} else if (key == SDLK_SLASH) {
+		if (modstate & KMOD_SHIFT) {
+			key_out = '?';
+		} else {
+			key_out = '/';
+		}
+	} else if (key == SDLK_SEMICOLON) {
+		if (modstate & KMOD_SHIFT) {
+			key_out = ':';
+		} else {
+			key_out = ';';
+		}
+	} else if (key == SDLK_QUOTE) {
+		if (modstate & KMOD_SHIFT) {
+			key_out = '\"';
+		} else {
+			key_out = '\'';
+		}
+	} else if (key == SDLK_LEFTBRACKET) {
+		if (modstate & KMOD_SHIFT) {
+			key_out = '{';
+		} else {
+			key_out = '[';
+		}
+	} else if (key == SDLK_RIGHTBRACKET) {
+		if (modstate & KMOD_SHIFT) {
+			key_out = '}';
+		} else {
+			key_out = ']';
+		}
+	} else if (key == SDLK_BACKSLASH) {
+		if (modstate & KMOD_SHIFT) {
+			key_out = '|';
+		} else {
+			key_out = '\\';
+		}
+	} else if (key == SDLK_MINUS) {
+		if (modstate & KMOD_SHIFT) {
+			key_out = '_';
+		} else {
+			key_out = '-';
+		}
+	} else if (key == SDLK_EQUALS) {
+		if (modstate & KMOD_SHIFT) {
+			key_out = '+';
+		} else {
+			key_out = '=';
+		}
+	} else if (key == SDLK_BACKQUOTE) {
+		if (modstate & KMOD_SHIFT) {
+			key_out = '~';
+		} else {
+			key_out = '`';
+		}
+	} else if (key == SDLK_1 && modstate & KMOD_SHIFT) {
+		key_out = '!';
+	} else if (key == SDLK_2 && modstate & KMOD_SHIFT) {
+		key_out = '@';
+	} else if (key == SDLK_3 && modstate & KMOD_SHIFT) {
+		key_out = '#';
+	} else if (key == SDLK_4 && modstate & KMOD_SHIFT) {
+		key_out = '$';
+	} else if (key == SDLK_5 && modstate & KMOD_SHIFT) {
+		key_out = '%';
+	} else if (key == SDLK_6 && modstate & KMOD_SHIFT) {
+		key_out = '^';
+	} else if (key == SDLK_7 && modstate & KMOD_SHIFT) {
+		key_out = '&';
+	} else if (key == SDLK_8 && modstate & KMOD_SHIFT) {
+		key_out = '*';
+	} else if (key == SDLK_9 && modstate & KMOD_SHIFT) {
+		key_out = '(';
+	} else if (key == SDLK_0 && modstate & KMOD_SHIFT) {
+		key_out = ')';
+	} else if (key == SDLK_KP_0) {
+		key_out = '0';
+	} else if (key == SDLK_KP_1) {
+		key_out = '1';
+	} else if (key == SDLK_KP_2) {
+		key_out = '2';
+	} else if (key == SDLK_KP_3) {
+		key_out = '3';
+	} else if (key == SDLK_KP_4) {
+		key_out = '4';
+	} else if (key == SDLK_KP_5) {
+		key_out = '5';
+	} else if (key == SDLK_KP_6) {
+		key_out = '6';
+	} else if (key == SDLK_KP_7) {
+		key_out = '7';
+	} else if (key == SDLK_KP_8) {
+		key_out = '8';
+	} else if (key == SDLK_KP_9) {
+		key_out = '9';
+	} else if (key == SDLK_KP_MINUS) {
+		key_out = '-';
+	} else if (key == SDLK_KP_EQUALS) {
+		key_out = '=';
+	} else if (key == SDLK_KP_PLUS) {
+		key_out = '+';
+	} else if (key == SDLK_KP_DIVIDE) {
+		key_out = '/';
+	} else if (key == SDLK_KP_MULTIPLY) {
+		key_out = '*';
+	} else if (key == SDLK_KP_DECIMAL) {
+		key_out = '.';
+	} else if (key == SDLK_KP_ENTER) {
+		key_out = 0x0d;
+	} else {
+		key_out = -1;
+	}
+
+	key_input(key_out, 0);
 }
 
 void processEvent(SDL_Event *e) {
-
-
 	switch (e->type) {
 		case SDL_CONTROLLERDEVICEADDED:
 			if (SDL_IsGameController(e->cdevice.which)) {
@@ -493,64 +628,70 @@ void processEvent(SDL_Event *e) {
 		}
 		case SDL_JOYDEVICEADDED:
 			printf("Joystick added: %s\n", SDL_JoystickNameForIndex(e->jdevice.which));
-		/*case SDL_CONTROLLERBUTTONDOWN:
+			return;
+		case SDL_KEYDOWN: 
+			setUsingKeyboard(1);
+			do_key_input(e->key.keysym.sym);
+			return;
+		case SDL_CONTROLLERBUTTONDOWN: {
+			SDL_GameController *controller = SDL_GameControllerFromInstanceID(e->cdevice.which);
+
+			int idx = SDL_GameControllerGetPlayerIndex(controller);
+			if (idx == -1) {
+				addplayer(controller);
+			} else if (players[idx].lockedOut) {
+				players[idx].lockedOut++;
+			}
+
+			setUsingKeyboard(0);
+			return;
+		}
+		case SDL_CONTROLLERBUTTONUP: {
+			SDL_GameController *controller = SDL_GameControllerFromInstanceID(e->cdevice.which);
+
+			int idx = SDL_GameControllerGetPlayerIndex(controller);
+			if (idx != -1 && players[idx].lockedOut) {
+				players[idx].lockedOut--;
+			}
+
+			return;
+		}
 		case SDL_CONTROLLERAXISMOTION:
 			setUsingKeyboard(0);
 			return;
-		case SDL_MOUSEBUTTONDOWN:
-			setUsingKeyboard(1);
-			if (e->button.button == SDL_BUTTON_LEFT) {
-				void (__stdcall *mouseMove)(int16_t, int16_t, int16_t) = (void*)0x00404950;
-				mouseMove(0x0000, (int16_t) e->button.x, (int16_t) e->button.y);
-			} else if (e->button.button == SDL_BUTTON_RIGHT) {
-				void (__stdcall *mouseMove)(int16_t, int16_t, int16_t) = (void*)0x00405010;
-				mouseMove(0x0000, (int16_t) e->button.x, (int16_t) e->button.y);
-			} else if (e->button.button == SDL_BUTTON_MIDDLE) {
-				void (__stdcall *mouseMove)(int16_t, int16_t, int16_t) = (void*)0x00404dc0;
-				mouseMove(0x0000, (int16_t) e->button.x, (int16_t) e->button.y);
-			}
-			return;
-		case SDL_MOUSEBUTTONUP:
-			setUsingKeyboard(1);
-			if (e->button.button == SDL_BUTTON_LEFT) {
-				void (__stdcall *mouseMove)(int16_t, int16_t, int16_t) = (void*)0x00404d20;
-				mouseMove(0x0000, (int16_t) e->button.x, (int16_t) e->button.y);
-			} else if (e->button.button == SDL_BUTTON_RIGHT) {
-				void (__stdcall *mouseMove)(int16_t, int16_t, int16_t) = (void*)0x004052d0;
-				mouseMove(0x0000, (int16_t) e->button.x, (int16_t) e->button.y);
-			} else if (e->button.button == SDL_BUTTON_MIDDLE) {
-				void (__stdcall *mouseMove)(int16_t, int16_t, int16_t) = (void*)0x00404f70;
-				mouseMove(0x0000, (int16_t) e->button.x, (int16_t) e->button.y);
-			}
-			return;
-		case SDL_MOUSEMOTION: {
-			setUsingKeyboard(1);
-			void (__stdcall *mouseMove)(int16_t, int16_t, int16_t) = (void*)0x00405370;
-			mouseMove(0x0000, (int16_t) e->motion.x, (int16_t) e->motion.y);
-			return;
-		}
 		case SDL_QUIT: {
-			void (__cdecl *resetEngine)() = (void *)0x0041ba40;	// script function to exit game
-			resetEngine();
+			int *shouldQuit = 0x00aab48e;	// 0084aa80
+			*shouldQuit = 1;
 			return;
 		}
-		case SDL_KEYDOWN: 
-			setUsingKeyboard(1);
-			return;*/
 		default:
 			return;
 	}
 }
 
 void __cdecl processController(device *dev) {
-	//printf("PROCESSING\n");
+	// cheating:
+	// replace type with index
+	//dev->type = 60;
+
+	//printf("Processing Controller %d %d %d!\n", dev->index, dev->slot, dev->port);
+	//printf("TYPE: %d\n", dev->type);
+	//printf("ISPLUGGEDIN: %d\n", dev->isPluggedIn);
+	dev->capabilities = 0x0003;
+	dev->num_actuators = 2;
+	dev->vibrationData_max[0] = 255;
+	dev->vibrationData_max[1] = 255;
+	dev->state = 2;
+	dev->actuatorsDisabled = 0;
+
 	SDL_Event e;
 	while(SDL_PollEvent(&e)) {
 		processEvent(&e);
+		//printf("EVENT!!!\n");
 	}
 
-	dev->isValid = 1;
-	dev->isPluggedIn = 1;
+	dev->isValid = 0;
+	dev->isPluggedIn = 0;
 
 	dev->controlData[0] = 0;
 	dev->controlData[1] = 0x70;
@@ -586,65 +727,65 @@ void __cdecl processController(device *dev) {
 	dev->controlData[6] = 127;
 	dev->controlData[7] = 127;
 
-	//if (!isKeyboardTyping()) {
-		pollKeyboard(dev);
-	//}
+	dev->controlData[20] = 0;
 
-	// TODO: maybe smart selection of active controller?
 	if (dev->port == 0) {
-		for (int i = 0; i < controllerCount; i++) {
-			pollController(dev, controllerList[i]);
+		dev->isValid = 1;
+		dev->isPluggedIn = 1;
+
+		if (!isKeyboardTyping()) {
+			pollKeyboard(dev);
+		}
+	}
+	
+	if (dev->port < MAX_PLAYERS) {
+		if (players[dev->port].controller && !players[dev->port].lockedOut) {
+			pollController(dev, players[dev->port].controller);
 		}
 	}
 
 	dev->controlData[2] = ~dev->controlData[2];
 	dev->controlData[3] = ~dev->controlData[3];
+	//dev->controlData[20] = ~dev->controlData[20];
 
-	//int (__stdcall *isVibrationOn)() = (void *)0x0041f910;
-	//int vibe = isVibrationOn();
-	//printf("IS VIBRATION ON: %d\n", vibe);	// enable vibration: 0041f970
+	if (0xFFFF ^ ((dev->controlData[2] << 8 ) | dev->controlData[3])) {
+		dev->pressed = 1;
+	} else {
+		dev->pressed = 0;
+	}
 
-	//printf("VIBRATION BUFFERS:\n");
-	//printf("%08x%08x%08x%08x%08x%08x%08x%08x\n", dev->vibrationData_align[0], dev->vibrationData_align[1], dev->vibrationData_align[2], dev->vibrationData_align[3], dev->vibrationData_align[4], dev->vibrationData_align[5], dev->vibrationData_align[6], dev->vibrationData_align[7]);
-	//printf("%08x%08x%08x%08x%08x%08x%08x%08x\n", dev->vibrationData_direct[0], dev->vibrationData_direct[1], dev->vibrationData_direct[2], dev->vibrationData_direct[3], dev->vibrationData_direct[4], dev->vibrationData_direct[5], dev->vibrationData_direct[6], dev->vibrationData_direct[7]);
-	//printf("%08x%08x%08x%08x%08x%08x%08x%08x\n", dev->vibrationData_max[0], dev->vibrationData_max[1], dev->vibrationData_max[2], dev->vibrationData_max[3], dev->vibrationData_max[4], dev->vibrationData_max[5], dev->vibrationData_max[6], dev->vibrationData_max[7]);
-	//printf("\n");
+	if (~dev->controlData[2] & 0x01 << 3 || ~dev->controlData[3] & 0x01 << 6) {
+		dev->start_or_a_pressed = 1;
+	} else {
+		dev->start_or_a_pressed = 0;
+	}
+
+	// keyboard text entry doesn't work unless these values are set correctly
+	/*uint8_t *unk2 = 0x00751dc0;
+	uint8_t *unk3 = 0x0074fb43;
+
+	*unk2 = 1;
+	*unk3 = 0;*/
+
+	//printf("UNKNOWN VALUES: 0x0074fb42: %d, 0x00751dc0: %d, 0x0074fb43: %d\n", *unk1, *unk2, *unk3);
 }
 
-void __cdecl acquireController(device *dev) {
-	printf("Acquiring Controller %d %d %d!\n", dev->index, dev->slot, dev->port);
-}
-
-void __cdecl unacquireController(device *dev) {
-	//printf("Unacquiring Controller %d!\n", dev->index);
-}
-
-void __cdecl createController(device *dev) {
-	printf("Initializing Controller index: %d, slot: %d, port: %d!\n", dev->index, dev->slot, dev->port);
-
-	
-}
-
-void __cdecl releaseController(device *dev) {
-	printf("Releasing Controller %d!\n", dev->index);
-}
-
-int newDevice(manager* m, int index) {
-	// we're treating a __thiscall as a __fastcall here, so we use a dummy parameter in the second slot.
-	// added an extra parameter as there seems to be something else pushed to the stack when calling this method
-	// WARNING: DO NOT TRY COMPILING THIS WITH O2.  IT DOES NOT WORK.  I DO NOT KNOW WHY
-	int (__fastcall *newDevice)(manager *, void *, int, void *) = (void *)0x0040dac0;
-	return newDevice(m, NULL, index, NULL);
+void __cdecl set_actuators(device *dev, uint16_t left, uint16_t right) {
+	printf("SETTING ACTUATORS: %d %d %d\n", dev->port, left, right);
+	for (int i = 0; i < controllerCount; i++) {
+		if (SDL_GameControllerGetAttached(controllerList[i]) && SDL_GameControllerGetPlayerIndex(controllerList[i]) == dev->port) {
+			SDL_JoystickRumble(SDL_GameControllerGetJoystick(controllerList[i]), left, right, 1000);
+		}
+	}
 }
 
 void __stdcall initManager() {
 	printf("Initializing Manager!\n");
-	//manager->hinstance = hinstance;
-	//manager->hwnd = hwnd;
 
 	// init sdl here
 	SDL_Init(SDL_INIT_GAMECONTROLLER);
 
+	//SDL_SetHint(SDL_HINT_HIDAPI_IGNORE_DEVICES, "0x1ccf/0x0000");
 	SDL_SetHint(SDL_HINT_GAMECONTROLLER_USE_BUTTON_LABELS, "false");
 
 	char *controllerDbPath[filePathBufLen];
@@ -660,81 +801,70 @@ void __stdcall initManager() {
 		
 	}
 
+	//loadInputSettings(&inputsettings);
 	loadKeyBinds(&keybinds);
 	loadControllerBinds(&padbinds);
 
 	initSDLControllers();
 
-	//newDevice(manager, 0);
-
-	//callFunc((void *)0x00403bb0);    // not sure what this is, but it needs to be called or the game crashes
+	/*if (inputsettings.isPs2Controls) {
+		registerPS2ControlPatch();
+		patchPs2Buttons();
+	}*/
 }
 
-int __stdcall getVKeyboardState(uint8_t *out) {
-	// translates from SDL scancode to windows vkey.  I want to die.
-	int keyCount;
-	uint8_t *keystate = SDL_GetKeyboardState(&keyCount);
-
-	memset(out, 0, 256);
-
-	for (int i = 0; i < keyCount; i++) {
-		if (keystate[i]) {
-			int idx = vkeyLUT[i];
-			out[idx] = 0x80;
-		}
-	}
-
-	/*int (*test1)() = (void *)0x00403df0;
-	printf("TEST 1: %d\n", test1());
-	uint8_t (*test2)() = (void *)0x004090b0;
-	printf("TEST 2: %d\n", test2());
-
-	int (*test3)() = (void *)0x00407a10;
-	printf("TEST 3: %d\n", test3());*/
-
-	return 1;
+#define spine_buttons_asm(SUCCESS, FAIL) __asm {	\
+	__asm push eax	\
+	__asm push ebx	\
+	__asm mov ebx, comp	\
+	__asm mov al, byte ptr [ebx + 0x834]	/* R2 */	\
+	__asm test al, al	\
+	__asm jne success	\
+	__asm mov al, byte ptr [ebx + 0x87c]	/* L2 */	\
+	__asm test al, al	\
+	__asm jne success	\
+	\
+__asm failure:	\
+	__asm pop ebx	\
+	__asm pop eax	\
+	__asm mov esp, ebp	\
+	__asm pop ebp	\
+	__asm push FAIL	\
+	__asm ret 0x08	\
+	\
+__asm success:	\
+	__asm pop ebx	\
+	__asm pop eax	\
+	__asm mov esp, ebp	\
+	__asm pop ebp	\
+	__asm push SUCCESS	\
+	__asm ret 0x08	\
 }
 
-uint16_t __stdcall getShiftCtrlState(int key) {
-	if (key == 0x10 && SDL_GetModState() & KMOD_SHIFT) {
-		return 0x8000;
-	} else if (key == 0x11 && SDL_GetModState() & KMOD_CTRL) {
-		return 0x8000;
-	}
+#define not_spine_buttons_asm(SUCCESS, FAIL) spine_buttons_asm(FAIL, SUCCESS)
 
-	return 0x0000;
+void __stdcall ground_gone(void *comp) {
+	not_spine_buttons_asm(0x004bc011, 0x004bc00a);
 }
 
-uint16_t __stdcall getCapsState(int key) {
-	if (SDL_GetModState() & KMOD_CAPS) {
-		return 0x0001;
-	}
-
-	return 0x0000;
+void __stdcall maybe_break_vert_1(void *comp) {
+	not_spine_buttons_asm(0x004ba399, 0x004b9428);
 }
 
-int processIntroEvent() {
-	int result = 0;
+void __stdcall maybe_break_vert_2(void *comp) {
+	not_spine_buttons_asm(0x004ba1d7, 0x004b9440);
+}
 
-	SDL_Event e;
-	while(SDL_PollEvent(&e)) {
-		switch(e.type) {
-			case SDL_CONTROLLERBUTTONDOWN:
-			case SDL_KEYDOWN:
-			case SDL_MOUSEBUTTONDOWN:
-				if (result == 0) {
-					result = 1;
-				}
-				break;
-			case SDL_QUIT:
-				result = 2;
-				break;
-		}
+void __stdcall in_air_physics_recovery(void *comp) {
+	spine_buttons_asm(0x004c0c66, 0x004c0c6d);
+}
 
-		processEvent(&e);
-	}
+void __stdcall in_air_physics_2(void *comp) {
+	spine_buttons_asm(0x004c127b, 0x004c12a8);
+}
 
-	return result;
+void __stdcall lip_side_hop(void *comp) {
+	spine_buttons_asm(0x004d1283, 0x004d12e8);
 }
 
 void patchInput() {
@@ -744,9 +874,12 @@ void patchInput() {
 	patchByte((void *)(0x005409b0 + 7), 0xC2);
 	patchByte((void *)(0x005409b0 + 8), 0x04);
 	patchByte((void *)(0x005409b0 + 9), 0x00);
+
+	patchCall(0x00542090, set_actuators);
+	patchByte(0x00542090, 0xe9);	// patch CALL to JMP
 	// acquire
-	patchThisToCdecl((void *)0x00541f70, &acquireController);
-	patchByte((void *)(0x00541f70 + 7), 0xC3);
+	//patchThisToCdecl((void *)0x00541f70, &acquireController);
+	//patchByte((void *)(0x00541f70 + 7), 0xC3);
 	// unacquire - NOT FOUND!!
 	//patchThisToCdecl((void *)0x0040d060, &unacquireController);
 	//patchByte((void *)(0x0040d060 + 7), 0xC3);
@@ -776,6 +909,28 @@ void patchInput() {
 	patchNop(0x00543147, 12);	// createDevice
 	patchNop(0x00543153, 11);	// sleep
 	patchCall(0x0054310A + 5, &initManager);
+
+	// ps2 controls - fix spine buttons
+	patchByte((void *)(0x004bbff6), 0x56);	// PUSH ESI
+	patchCall((void *)(0x004bbff6 + 1), ground_gone);
+	
+	patchByte((void *)(0x004b9410), 0x56);	// PUSH ESI
+	patchCall((void *)(0x004b9410 + 1), maybe_break_vert_1);
+
+	patchByte((void *)(0x004b9428), 0x56);	// PUSH ESI
+	patchCall((void *)(0x004b9428 + 1), maybe_break_vert_2);
+	
+	patchByte((void *)(0x004c0c52), 0x56);	// PUSH ESI
+	patchCall((void *)(0x004c0c52 + 1), in_air_physics_recovery);
+	
+	patchByte((void *)(0x004c1267), 0x56);	// PUSH ESI
+	patchCall((void *)(0x004c1267 + 1), in_air_physics_2);
+
+	patchByte((void *)(0x004d126f), 0x56);	// PUSH ESI
+	patchCall((void *)(0x004d126f + 1), lip_side_hop);
+
+	//patchByte(0x004c126f, 0x75);
+	//patchByte(0x004c126f + 1, 0x0a);
 
 	//patchThisToCdecl((void *)0x0040db20, &initManager);
 	// MOV EAX,0x01 (return 1) NOTE: we're only doing this to be good.  nothing ever reads the return value
