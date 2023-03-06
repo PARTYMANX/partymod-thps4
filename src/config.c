@@ -156,11 +156,17 @@ void patchWindow() {
 	patchCall(0x005319ab + 5, createSDLWindow);
 
 	patchNop(0x00531a84, 2);
-	//patchByte(0x006b3290 + 5, 0xc3);
-	
-	//patchDWord(0x0050d025 + 1, &resbuffer);
 
-	//patchNop(0x005352b3, 14);	// don't move window to corner
+	// remove showcursor
+	patchNop(0x0043f368, 3);
+	patchNop(0x00531b47, 4);
+
+	// remove setfocus
+	patchNop(0x0043f3a1, 7);
+
+	// remove showwindow
+	patchNop(0x0043f392, 9);
+	patchNop(0x00531a81, 5);
 
 	patchCall(0x005430ba, writeConfigValues);	// don't load config, use our own
 
@@ -209,7 +215,8 @@ void loadInputSettings(struct inputsettings *settingsOut) {
 	sprintf(configFile, "%s%s", executableDirectory, CONFIG_FILE_NAME);
 
 	if (settingsOut) {
-		//settingsOut->isPs2Controls = getIniBool("Miscellaneous", "UsePS2Controls", 1, configFile);
+		settingsOut->isPs2Controls = getIniBool("Miscellaneous", "UsePS2Controls", 1, configFile);
+		settingsOut->dropdownEnabled = getIniBool("Miscellaneous", "EnablePCDropdown", 1, configFile);
 	}
 }
 
@@ -221,8 +228,6 @@ void loadKeyBinds(struct keybinds *bindsOut) {
 		bindsOut->menu = GetPrivateProfileInt(KEYBIND_SECTION, "Pause", SDL_SCANCODE_RETURN, configFile);
 		bindsOut->cameraToggle = GetPrivateProfileInt(KEYBIND_SECTION, "ViewToggle", SDL_SCANCODE_F, configFile);
 		bindsOut->cameraSwivelLock = GetPrivateProfileInt(KEYBIND_SECTION, "SwivelLock", SDL_SCANCODE_GRAVE, configFile);
-		//bindsOut->focus = GetPrivateProfileInt(CONTROLLER_SECTION, "Focus", SDL_SCANCODE_KP_ENTER, configFile);
-		//bindsOut->caveman = GetPrivateProfileInt(CONTROLLER_SECTION, "Caveman", SDL_SCANCODE_E, configFile);
 
 		bindsOut->grind = GetPrivateProfileInt(KEYBIND_SECTION, "Grind", SDL_SCANCODE_KP_8, configFile);
 		bindsOut->grab = GetPrivateProfileInt(KEYBIND_SECTION, "Grab", SDL_SCANCODE_KP_6, configFile);
@@ -254,8 +259,6 @@ void loadControllerBinds(struct controllerbinds *bindsOut) {
 		bindsOut->menu = GetPrivateProfileInt(CONTROLLER_SECTION, "Pause", CONTROLLER_BUTTON_START, configFile);
 		bindsOut->cameraToggle = GetPrivateProfileInt(CONTROLLER_SECTION, "ViewToggle", CONTROLLER_BUTTON_BACK, configFile);
 		bindsOut->cameraSwivelLock = GetPrivateProfileInt(CONTROLLER_SECTION, "SwivelLock", CONTROLLER_BUTTON_RIGHTSTICK, configFile);
-		//bindsOut->focus = GetPrivateProfileInt(CONTROLLER_SECTION, "Focus", CONTROLLER_BUTTON_LEFTSTICK, configFile);
-		//bindsOut->caveman = GetPrivateProfileInt(CONTROLLER_SECTION, "Caveman", 0, configFile);
 
 		bindsOut->grind = GetPrivateProfileInt(CONTROLLER_SECTION, "Grind", CONTROLLER_BUTTON_Y, configFile);
 		bindsOut->grab = GetPrivateProfileInt(CONTROLLER_SECTION, "Grab", CONTROLLER_BUTTON_B, configFile);

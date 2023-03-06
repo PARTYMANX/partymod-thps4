@@ -224,18 +224,6 @@ void __fastcall speed_limiter(void *skater) {
 	apply_air_friction(skater, friction);
 }
 
-void get_fake_timer() {
-	double time = 1.0 / 240.0;	// 1/60
-	__asm {
-		fld time
-	}
-}
-
-void patchTimer() {
-	patchCall(0x00543d70, get_fake_timer);
-	patchByte(0x00543d70+5, 0xc3);
-}
-
 void patchFriction() {
 	//patchTimer();
 	//patchCall(0x004c9946, get_fake_timer);
@@ -281,7 +269,7 @@ void initPatch() {
 
 	//patchResolution();
 
-	//initScriptPatches();
+	initScriptPatches();
 
 	/*int disableMovies = getIniBool("Miscellaneous", "NoMovie", 0, configFile);
 	if (disableMovies) {
@@ -315,8 +303,6 @@ void patchLogicRate() {
 	patchCall(0x00429437, do_game_logic);
 }
 
-uint64_t prevFrame = 0;
-
 void safeWait(uint64_t endTime) {
 	uint64_t timerFreq = SDL_GetPerformanceFrequency();
 	uint64_t safetyThreshold = timerFreq / 1000 * 2;	// 2ms
@@ -337,25 +323,25 @@ void safeWait(uint64_t endTime) {
 	}
 }
 
+uint64_t nextFrame = 0;
+
 void do_frame_cap() {
 	// hook to insert a frame cap into the game loop
 	void (__cdecl *prerender)() = 0x00446950;
 
 	// do frame cap here
+	// TODO: maybe better solution:
+	// if we're early, wait, set next frame to next 60th
+	// if we're late, don't wait, set next from to next 60th from *now*
+
 	uint64_t timerFreq = SDL_GetPerformanceFrequency();
 	uint64_t frameTarget = timerFreq / 60;
+	//printf("FREQUENCY: %lld, %lld\n", timerFreq, frameTarget);
 
-	if (!prevFrame) {
-		prevFrame = SDL_GetPerformanceCounter();
-	}
-
-	uint64_t nextFrame = prevFrame + frameTarget;
-	safeWait(nextFrame);
-
-	prevFrame = nextFrame;
-
-	// if we're behind, catch us up	TODO: deal with seams
-	while (nextFrame < SDL_GetPerformanceCounter()) {
+	if (!nextFrame || nextFrame < SDL_GetPerformanceCounter()) {
+		nextFrame = SDL_GetPerformanceCounter() + frameTarget;
+	} else {
+		safeWait(nextFrame);
 		nextFrame += frameTarget;
 	}
 
@@ -365,6 +351,39 @@ void do_frame_cap() {
 
 void patchFrameCap() {
 	patchCall(0x0042940f, do_frame_cap);
+}
+
+void patchIsPs2() {
+	patchByte(0x00510e38, 0xeb);
+}
+
+void patchDisableGamma() {
+	patchByte(0x004398d0, 0xc3);	// return immediately when changing gamma
+}
+
+void patchPrintf() {
+	// these all seem to crash the game.  oh well!
+	//patchCall(0x00535ef0, printf);
+	//patchByte(0x00535ef0, 0xe9);	// CALL to JMP
+	
+	patchCall(0x00405b60, printf);
+	patchByte(0x00405b60, 0xe9);	// CALL to JMP
+}
+
+int isCD() {
+	return 0;
+}
+
+int isNotCD() {
+	return 1;
+}
+
+void patchCD() {
+	patchCall(0x00535f00, isNotCD);
+	patchByte(0x00535f00, 0xe9);
+
+	//patchCall(0x00543fd0, isCD);
+	//patchByte(0x00543fd0, 0xe9);
 }
 
 __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpReserved) {
@@ -382,7 +401,11 @@ __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, L
 			patchInput();
 			patchCall((void *)(0x005319ab), &(initPatch));
 			//patchLoadConfig();
-			//patchScriptHook();
+			patchScriptHook();
+			//patchIsPs2();
+			patchDisableGamma();
+			//patchPrintf();
+			//patchCD();
 
 			break;
 

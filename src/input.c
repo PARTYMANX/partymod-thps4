@@ -59,7 +59,7 @@ void patchPs2Buttons();
 int controllerCount;
 int controllerListSize;
 SDL_GameController **controllerList;
-//struct inputsettings inputsettings;
+struct inputsettings inputsettings;
 struct keybinds keybinds;
 struct controllerbinds padbinds;
 
@@ -450,13 +450,14 @@ void pollKeyboard(device *dev) {
 
 // returns 1 if a text entry prompt is on-screen so that keybinds don't interfere with text entry confirmation/cancellation
 uint8_t isKeyboardTyping() {
-	//uint8_t *keyboard_on_screen = 0x00ab5bac;
+	uint8_t *keyboard_on_screen = 0x00ab5bac;
 
-	//return *keyboard_on_screen;
+	return *keyboard_on_screen;
 }
 
 void do_key_input(SDL_KeyCode key) {
 	void (*key_input)(int32_t key, uint32_t param) = (void *)0x005426c0;
+	void (*key_input_arrow)(int32_t key, uint32_t param) = (void *)0x00542730;
 	uint8_t *keyboard_on_screen = 0x00ab5bac;
 
 	//if (!*keyboard_on_screen) {
@@ -467,6 +468,27 @@ void do_key_input(SDL_KeyCode key) {
 	uint8_t modstate = SDL_GetModState();
 	uint8_t shift = SDL_GetModState() & KMOD_SHIFT;
 	uint8_t caps = SDL_GetModState() & KMOD_CAPS;
+
+	// send arrow key inputs to other event
+	if (key >= SDLK_RIGHT && key <= SDLK_UP) {
+		switch(key) {
+		case SDLK_RIGHT:
+			key_out = 0x27;
+			break;
+		case SDLK_LEFT:
+			key_out = 0x25;
+			break;
+		case SDLK_DOWN:
+			key_out = 0x28;
+			break;
+		case SDLK_UP:
+			key_out = 0x26;
+			break;
+		}
+
+		key_input_arrow(key_out, 0);
+		return;
+	}
 
 	if (key == SDLK_RETURN) {
 		key_out = 0x0d;	// CR
@@ -660,7 +682,7 @@ void processEvent(SDL_Event *e) {
 			setUsingKeyboard(0);
 			return;
 		case SDL_QUIT: {
-			int *shouldQuit = 0x00aab48e;	// 0084aa80
+			int *shouldQuit = 0x00aab48c;
 			*shouldQuit = 1;
 			return;
 		}
@@ -674,6 +696,7 @@ void __cdecl processController(device *dev) {
 	// replace type with index
 	//dev->type = 60;
 
+	//printf("IS KEYBOARD ON SCREEN: %d\n", isKeyboardTyping());
 	//printf("Processing Controller %d %d %d!\n", dev->index, dev->slot, dev->port);
 	//printf("TYPE: %d\n", dev->type);
 	//printf("ISPLUGGEDIN: %d\n", dev->isPluggedIn);
@@ -771,7 +794,7 @@ void __cdecl processController(device *dev) {
 }
 
 void __cdecl set_actuators(device *dev, uint16_t left, uint16_t right) {
-	printf("SETTING ACTUATORS: %d %d %d\n", dev->port, left, right);
+	//printf("SETTING ACTUATORS: %d %d %d\n", dev->port, left, right);
 	for (int i = 0; i < controllerCount; i++) {
 		if (SDL_GameControllerGetAttached(controllerList[i]) && SDL_GameControllerGetPlayerIndex(controllerList[i]) == dev->port) {
 			SDL_JoystickRumble(SDL_GameControllerGetJoystick(controllerList[i]), left, right, 1000);
@@ -801,16 +824,18 @@ void __stdcall initManager() {
 		
 	}
 
-	//loadInputSettings(&inputsettings);
+	loadInputSettings(&inputsettings);
 	loadKeyBinds(&keybinds);
 	loadControllerBinds(&padbinds);
 
 	initSDLControllers();
 
-	/*if (inputsettings.isPs2Controls) {
-		registerPS2ControlPatch();
+	if (inputsettings.isPs2Controls) {
+		registerInputScriptPatches(1);
 		patchPs2Buttons();
-	}*/
+	} else if (inputsettings.dropdownEnabled) {
+		registerInputScriptPatches(0);
+	}
 }
 
 #define spine_buttons_asm(SUCCESS, FAIL) __asm {	\
@@ -867,6 +892,27 @@ void __stdcall lip_side_hop(void *comp) {
 	spine_buttons_asm(0x004d1283, 0x004d12e8);
 }
 
+void patchPs2Buttons() {
+	// ps2 controls - fix spine buttons
+	patchByte((void *)(0x004bbff6), 0x56);	// PUSH ESI
+	patchCall((void *)(0x004bbff6 + 1), ground_gone);
+	
+	patchByte((void *)(0x004b9410), 0x56);	// PUSH ESI
+	patchCall((void *)(0x004b9410 + 1), maybe_break_vert_1);
+
+	patchByte((void *)(0x004b9428), 0x56);	// PUSH ESI
+	patchCall((void *)(0x004b9428 + 1), maybe_break_vert_2);
+	
+	patchByte((void *)(0x004c0c52), 0x56);	// PUSH ESI
+	patchCall((void *)(0x004c0c52 + 1), in_air_physics_recovery);
+	
+	patchByte((void *)(0x004c1267), 0x56);	// PUSH ESI
+	patchCall((void *)(0x004c1267 + 1), in_air_physics_2);
+
+	patchByte((void *)(0x004d126f), 0x56);	// PUSH ESI
+	patchCall((void *)(0x004d126f + 1), lip_side_hop);
+}
+
 void patchInput() {
 	// patch SIO::Device
 	// process
@@ -909,25 +955,6 @@ void patchInput() {
 	patchNop(0x00543147, 12);	// createDevice
 	patchNop(0x00543153, 11);	// sleep
 	patchCall(0x0054310A + 5, &initManager);
-
-	// ps2 controls - fix spine buttons
-	patchByte((void *)(0x004bbff6), 0x56);	// PUSH ESI
-	patchCall((void *)(0x004bbff6 + 1), ground_gone);
-	
-	patchByte((void *)(0x004b9410), 0x56);	// PUSH ESI
-	patchCall((void *)(0x004b9410 + 1), maybe_break_vert_1);
-
-	patchByte((void *)(0x004b9428), 0x56);	// PUSH ESI
-	patchCall((void *)(0x004b9428 + 1), maybe_break_vert_2);
-	
-	patchByte((void *)(0x004c0c52), 0x56);	// PUSH ESI
-	patchCall((void *)(0x004c0c52 + 1), in_air_physics_recovery);
-	
-	patchByte((void *)(0x004c1267), 0x56);	// PUSH ESI
-	patchCall((void *)(0x004c1267 + 1), in_air_physics_2);
-
-	patchByte((void *)(0x004d126f), 0x56);	// PUSH ESI
-	patchCall((void *)(0x004d126f + 1), lip_side_hop);
 
 	//patchByte(0x004c126f, 0x75);
 	//patchByte(0x004c126f + 1, 0x0a);

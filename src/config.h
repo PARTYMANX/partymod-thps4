@@ -89,6 +89,12 @@ struct controllerbinds {
 	controllerStick camera;
 };
 
+struct inputsettings {
+	uint8_t isPs2Controls;
+	uint8_t dropdownEnabled;
+};
+
+void loadInputSettings(struct inputsettings *settingsOut);
 void loadControllerBinds(struct controllerbinds *bindsOut);
 void loadKeyBinds(struct keybinds *bindsOut);
 int getIniBool(char *section, char *key, int def, char *file);

@@ -1,32 +1,22 @@
-#include <stdlib.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <errno.h>
+#include <conio.h>
 #include <string.h>
 
 #include <incbin/incbin.h>
-#include <Windows.h>
 
-#include <global.h>
-#include <patch.h>
+INCBIN(patch, "executable.bps");
 
-#include <hash.h>
+#define EXE_NAME "Skate4.exe"
+#define OUTPUT_NAME "THPS4.exe"
 
-INCBIN(GrindScriptsPCAddDD, "patches/grindscripts_pcadddd.bps");	// old script mod to map dropdown to spine transfer
-INCBIN(GrindScriptsPs2ToPc, "patches/grindscripts_ps2topc.bps");	// script mod to enable dropdowns with isWIN32 instead of isPs2
-
-map_t *scriptMap;
-
+uint32_t crc32(const void *buf, size_t size);
 int applyPatch(uint8_t *patch, size_t patchLen, uint8_t *input, size_t inputLen, uint8_t **output, size_t *outputLen);
 
-uint8_t *__cdecl dumpScript(char *filename) {
-	//printf("LOADING SCRIPT %s\n", filename);
-
-	uint8_t result;
-
-	char filenameBuffer[1024];
-	sprintf(filenameBuffer, "%sdata\\%s", executableDirectory, filename);
-
-	FILE *f = fopen(filenameBuffer, "rb");
+int main(int argc, char **argv) {
+	// open executable and dump contents
+	FILE *f = fopen(EXE_NAME, "rb");
 
 	if (f) {
 		// get file length
@@ -37,132 +27,57 @@ uint8_t *__cdecl dumpScript(char *filename) {
 		uint8_t *buffer = malloc(filesize);
 
 		if (buffer) {
+			printf("Patching %s\n", EXE_NAME);
 			fread(buffer, 1, filesize, f);
 
-			uint8_t *patch = map_get(scriptMap, filename, strlen(filename));
-			if (patch) {
-				printf("Applying patch for %s\n", filename);
-				size_t patchLen = map_getsz(scriptMap, filename, strlen(filename));
-				uint8_t *patchedBuffer = NULL;
-				size_t patchedBufferLen = 0;
-
-				int result = applyPatch(patch, patchLen, buffer, filesize, &patchedBuffer, &patchedBufferLen);
-				
-				if (!result) {
-					fclose(f);
-					free(buffer);
-
-					return patchedBuffer;
-				} else {
-					fclose(f);
-					free(patchedBuffer);
-
-					printf("Patch failed! Loading original script\n");
-
-					return buffer;
-				}
-
-				free(patchedBuffer);
-			} else {
-				fclose(f);
-				return buffer;
+			// check input crc (not using the one in the bps due to multiple valid executables)
+			uint32_t inputcrc = crc32(buffer, filesize);
+			if (inputcrc != 0xd2c18c0f) {
+				printf("INPUT CRC DOES NOT MATCH EXPECTED: %08x\n", inputcrc);
+				printf("Patch Failed!\n");
 			}
 
-			free(buffer);
-		}
+			// patch
+			uint8_t *patchedBuffer = NULL;
+			size_t patchedLen = 0;
+			int result = applyPatch(gpatchData, gpatchSize, buffer, filesize, &patchedBuffer, &patchedLen);
+			if (result) {
+				printf("Patching Failed!\n");
 
-		fclose(f);
+				goto end;
+			}
 
-		return NULL;
-	} else {
-		printf("FAILED TO OPEN SCRIPT %s: %s\n", filenameBuffer, strerror(errno));
+			// check crc (again, not using the one in the bps due to multiple valid executables)
+			uint32_t outputcrc = crc32(patchedBuffer, patchedLen);
+			if (outputcrc != 0x528cf068) {
+				printf("OUTPUT CRC DOES NOT MATCH EXPECTED: %08x\n", outputcrc);
+				printf("Patch Failed!\n");
 
-		return NULL;
-	}
-};
+				goto end;
+			}
 
-void registerPatch(char *name, unsigned int sz, char *data) {
-	map_put(scriptMap, name, strlen(name), data, sz);
-	printf("Registered patch for %s\n", name);
-}
-
-void registerInputScriptPatches(uint8_t usingPs2Controls) {
-	if (usingPs2Controls) {
-		registerPatch("scripts\\grindscripts.qb", gGrindScriptsPs2ToPcSize, gGrindScriptsPs2ToPcData);
-	} else {
-		registerPatch("scripts\\grindscripts.qb", gGrindScriptsPCAddDDSize, gGrindScriptsPCAddDDData);
-	}
-}
-
-void initScriptPatches() {
-	scriptMap = map_alloc(16, NULL, NULL);
-
-	//registerPatch("scripts\\optionsmenu.qb", gOptionsMenuSize, gOptionsMenuData);
-}
-
-// custom file loader.  might be worth writing a wrapper instead to intercept loads (called at 0x005387bb) 
-// NOTE: crashes the game when installed.  
-// i assume pre loading is still broken as it doesn't get anything when it's asking for files that definitely don't exist
-int __cdecl loadFile(char *filename, int *size, void *dst) {
-	printf("LOADING FILE %s\n", filename);
-
-	// their malloc, have to use this to prevent a crash down the line when the memory is freed
-	void *(__cdecl *mem_malloc)(int) = (void *)0x00534d50;
-
-	uint8_t *buffer;
-
-	// try to load from pre
-	void **pre_mgr = (void **)0x00b09624;
-	uint8_t *(__fastcall *Pre_LoadFile)(void *, void *, char *, int *, void *) = (void *)0x00538430;
-	buffer = Pre_LoadFile(*pre_mgr, NULL, filename, size, dst);
-
-	if (buffer) {
-		printf("LOADED FROM PRE\n");
-		return buffer;
-	}
-
-	char filenameBuffer[1024];
-	sprintf(filenameBuffer, "%sdata\\%s", executableDirectory, filename);
-
-	FILE *f = fopen(filenameBuffer, "rb");
-
-	if (f) {
-		// get file length
-		fseek(f, 0, SEEK_END);
-		size_t filesize = ftell(f);
-		fseek(f, 0, SEEK_SET);
-
-		if (!dst) {
-			buffer = mem_malloc(filesize);
+			// write to new exe
+			printf("Creating %s\n", OUTPUT_NAME);
+			FILE *fout = fopen(OUTPUT_NAME, "wb");
+			if (fout) {
+				fwrite(patchedBuffer, 1, patchedLen, fout);
+				fclose(fout);
+				printf("Patch Successful!\n");
+			} else {
+				printf("FAILED TO OPEN EXECUTABLE %s: %s\n", OUTPUT_NAME, strerror(errno));
+			}
 		} else {
-			buffer = dst;
+			printf("Failed to allocate file buffer!\n");
 		}
-
-		if (buffer) {
-			fread(buffer, 1, filesize, f);
-
-			*size = filesize;
-			fclose(f);
-			return buffer;
-		}
-		
-		printf("FAILED TO LOAD\n");
-		fclose(f);
-		return NULL;
+	} else {
+		printf("FAILED TO OPEN EXECUTABLE %s: %s\n", EXE_NAME, strerror(errno));
 	}
 
-	printf("COULDN'T LOAD THE FILE IDIOT\n");
-	return NULL;
-}
+end:
+	printf("Press any key to continue\n");
+	getch();
 
-void patchScriptHook() {
-	// patch the function that loads scripts
-
-	// call our file load
-	patchCall(0x0040b50e, dumpScript);
-
-	//patchCall(0x00538dc0, loadFile);
-	//patchByte(0x00538dc0, 0xe9);	// patch call to jmp
+	return 0;
 }
 
 const uint32_t crc32lut[] = {
@@ -314,33 +229,6 @@ int applyPatch(uint8_t *patch, size_t patchLen, uint8_t *input, size_t inputLen,
 				break;
 			}
 		}
-	}
-
-	uint32_t inputcrc = 0;
-	inputcrc |= readByte(patch, &patchOffset);
-	inputcrc |= readByte(patch, &patchOffset) << 8;
-	inputcrc |= readByte(patch, &patchOffset) << 16;
-	inputcrc |= readByte(patch, &patchOffset) << 24;
-	if (inputcrc != crc32(input, inputLen)) {
-		printf("INPUT CRC DID NOT MATCH: %x %x\n", inputcrc, crc32(input, inputLen));
-	}
-
-	uint32_t outputcrc = 0;
-	outputcrc |= readByte(patch, &patchOffset);
-	outputcrc |= readByte(patch, &patchOffset) << 8;
-	outputcrc |= readByte(patch, &patchOffset) << 16;
-	outputcrc |= readByte(patch, &patchOffset) << 24;
-	if (outputcrc != crc32(*output, *outputLen)) {
-		printf("INPUT CRC DID NOT MATCH: %x %x\n", outputcrc, crc32(*output, *outputLen));
-	}
-
-	uint32_t patchcrc = 0;
-	patchcrc |= readByte(patch, &patchOffset);
-	patchcrc |= readByte(patch, &patchOffset) << 8;
-	patchcrc |= readByte(patch, &patchOffset) << 16;
-	patchcrc |= readByte(patch, &patchOffset) << 24;
-	if (patchcrc != crc32(patch, patchLen - 4)) {
-		printf("INPUT CRC DID NOT MATCH: %x %x\n", patchcrc, crc32(patch, patchLen));
 	}
 
 	return 0;

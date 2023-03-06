@@ -11,8 +11,8 @@ set(SOURCE_FILES
 	"${SRC}/config.c"
 	"${SRC}/input.c"
 	"${SRC}/hash.c"
-	#"${SRC}/script.c"
-	#"${SRC}/patches.c"
+	"${SRC}/script.c"
+	"${SRC}/patches.c"
 )
 
 set(HEADER_FILES
@@ -20,8 +20,8 @@ set(HEADER_FILES
 	"${SRC}/patch.h"
 	"${SRC}/config.h"
 	"${SRC}/input.h"
-	#"${SRC}/hash.h"
-	#"${SRC}/script.h"
+	"${SRC}/hash.h"
+	"${SRC}/script.h"
 )
 
 list(APPEND INCLUDES ${THIRDPARTY})
@@ -48,18 +48,18 @@ target_include_directories(partymod PUBLIC
 	${INCLUDES}
 )
 
-#add_executable(partyconfig)
+add_executable(partyconfig)
 
-#target_sources(partyconfig PUBLIC config/main.c)
-#target_link_libraries(partyconfig PRIVATE 
-#	${LIBS}
-#	comctl32.lib
-#	UxTheme.lib
-#)
-#target_include_directories(partyconfig PUBLIC
-#	"${PROJECT_SOURCE_DIR}/src"
-#	${INCLUDES}
-#)
+target_sources(partyconfig PUBLIC config/main.c)
+target_link_libraries(partyconfig PRIVATE 
+	${LIBS}
+	comctl32.lib
+	UxTheme.lib
+)
+target_include_directories(partyconfig PUBLIC
+	"${PROJECT_SOURCE_DIR}/src"
+	${INCLUDES}
+)
 
 add_executable(incbin)
 
@@ -68,14 +68,14 @@ target_sources(incbin PUBLIC
 	"${THIRDPARTY}/incbin/incbin.h"
 )
 
-#add_executable(partypatcher)
+add_executable(partypatcher)
 
-#target_sources(partypatcher PUBLIC
-#	"${CMAKE_SOURCE_DIR}/patcher/main.c"
-#	"${CMAKE_SOURCE_DIR}/patcher/data.c"
-#)
+target_sources(partypatcher PUBLIC
+	"${CMAKE_SOURCE_DIR}/patcher/main.c"
+	"${CMAKE_SOURCE_DIR}/patcher/data.c"
+)
 
-#target_include_directories(partypatcher PUBLIC
-#	"${CMAKE_SOURCE_DIR}/src"
-#	${THIRDPARTY}
-#)
+target_include_directories(partypatcher PUBLIC
+	"${CMAKE_SOURCE_DIR}/src"
+	${THIRDPARTY}
+)
