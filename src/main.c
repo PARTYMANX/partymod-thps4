@@ -1,4 +1,5 @@
 #include <windows.h>
+#include <d3d9.h>
 
 #include <stdio.h>
 #include <stdint.h>
@@ -241,6 +242,8 @@ void patchFriction() {
 	//patchNop(0x004c0138, 5);
 }
 
+void patchDisableGamma();
+
 void initPatch() {
 	GetModuleFileName(NULL, &executableDirectory, filePathBufLen);
 
@@ -276,6 +279,11 @@ void initPatch() {
 		printf("Disabling movies\n");
 		patchNoMovie();
 	}*/
+
+	int disableGamma = getIniBool("Graphics", "DisableFullscreenGamma", 1, configFile);
+	if (disableGamma) {
+		patchDisableGamma();
+	}
 
 	printf("Patch Initialized\n");
 }
@@ -353,6 +361,31 @@ void patchFrameCap() {
 	patchCall(0x0042940f, do_frame_cap);
 }
 
+struct flashVertex {
+	float x, y, z, w;
+	uint32_t color;
+	float u, v;
+};
+
+// vertices are passed into the render function in the wrong order when drawing screen flashes; reorder them before passing to draw
+void __fastcall reorder_flash_vertices(uint32_t *d3dDevice, void *unused, void *alsodevice, uint32_t prim, uint32_t count, struct flashVertex *vertices, uint32_t stride){
+	void(__fastcall *drawPrimitiveUP)(void *, void *, void *, uint32_t, uint32_t, struct flashVertex *, uint32_t) = d3dDevice[72];
+
+	struct flashVertex tmp;
+
+	tmp = vertices[0];
+	vertices[0] = vertices[1];
+	vertices[1] = vertices[2];
+	vertices[2] = tmp;
+
+	drawPrimitiveUP(d3dDevice, unused, alsodevice, prim, count, vertices, stride);
+}
+
+void patchScreenFlash() {
+	patchNop(0x0044bdce, 6);
+	patchCall(0x0044bdce, reorder_flash_vertices);
+}
+
 void patchIsPs2() {
 	patchByte(0x00510e38, 0xeb);
 }
@@ -382,8 +415,8 @@ void patchCD() {
 	patchCall(0x00535f00, isNotCD);
 	patchByte(0x00535f00, 0xe9);
 
-	//patchCall(0x00543fd0, isCD);
-	//patchByte(0x00543fd0, 0xe9);
+	patchCall(0x00543fd0, isCD);
+	patchByte(0x00543fd0, 0xe9);
 }
 
 __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpReserved) {
@@ -403,7 +436,8 @@ __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, L
 			//patchLoadConfig();
 			patchScriptHook();
 			//patchIsPs2();
-			patchDisableGamma();
+			patchScreenFlash();
+			
 			//patchPrintf();
 			//patchCD();
 
