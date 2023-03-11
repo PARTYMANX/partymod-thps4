@@ -681,6 +681,18 @@ void processEvent(SDL_Event *e) {
 		case SDL_CONTROLLERAXISMOTION:
 			setUsingKeyboard(0);
 			return;
+		case SDL_WINDOWEVENT:
+			if (e->window.type == SDL_WINDOWEVENT_FOCUS_LOST) {
+				int *unkFocus = (int *)0x00aab48e;	// i think this is related to video crashes when display is lost
+				*unkFocus = 1;
+
+				int *isFocused = (int *)0x005a027c;
+				*isFocused = 0;
+			} else if (e->window.type == SDL_WINDOWEVENT_FOCUS_GAINED) {
+				int *isFocused = (int *)0x005a027c;
+				*isFocused = 1;
+			}
+			return;
 		case SDL_QUIT: {
 			int *shouldQuit = 0x00aab48c;
 			*shouldQuit = 1;
@@ -838,6 +850,23 @@ void __stdcall initManager() {
 	}
 }
 
+uint8_t movieSkipHasBeenPressed = 0;
+
+uint8_t movieKeyboardInput() {
+	uint8_t *keyboardState = SDL_GetKeyboardState(NULL);
+
+	if (keyboardState[SDL_SCANCODE_SPACE] || keyboardState[SDL_SCANCODE_ESCAPE] || keyboardState[SDL_SCANCODE_RETURN]) {
+		if (!movieSkipHasBeenPressed) {
+			movieSkipHasBeenPressed = 1;
+			return 0;
+		}
+	} else {
+		movieSkipHasBeenPressed = 0;
+	}
+
+	return 1;
+}
+
 #define spine_buttons_asm(SUCCESS, FAIL) __asm {	\
 	__asm push eax	\
 	__asm push ebx	\
@@ -923,31 +952,7 @@ void patchInput() {
 
 	patchCall(0x00542090, set_actuators);
 	patchByte(0x00542090, 0xe9);	// patch CALL to JMP
-	// acquire
-	//patchThisToCdecl((void *)0x00541f70, &acquireController);
-	//patchByte((void *)(0x00541f70 + 7), 0xC3);
-	// unacquire - NOT FOUND!!
-	//patchThisToCdecl((void *)0x0040d060, &unacquireController);
-	//patchByte((void *)(0x0040d060 + 7), 0xC3);
-	// init
-	//patchThisToCdecl((void *)0x00541df0, &initController);
-	//patchByte((void *)(0x00541df0 + 7), 0xC2);
-	//patchByte((void *)(0x00541df0 + 8), 0x04);
-	//patchByte((void *)(0x00541df0 + 9), 0x00);
-	// release
-	//patchThisToCdecl((void *)0x00541ed0, &releaseController);
-	//patchByte((void *)(0x00541ed0 + 7), 0xC3);
 
-	// patch SIO::Manager
-	// 0x40db20 - Init
-	// init
-	//patchNop((void *)0x0040db3a, 66);   // directinput8create
-	//patchNop((void *)0x0040db20, 156);
-	//patchNop((void *)0x0040db81, 4);  // setup newdevice call (needed)
-	//patchNop((void *)0x0040db8f, 15); // newdevice (0) (needed)
-	//patchNop((void *)0x0040db9e, 18);   // enumdevices
-	//patchNop(0x0040dbb0, 5);  // function that must be called
-	
 	// init input patch - nop direct input setup
 	//patchNop(0x005430fc, 49);
 	patchNop(0x0054310A, 35);	// DirectInput8Create
@@ -956,45 +961,10 @@ void patchInput() {
 	patchNop(0x00543153, 11);	// sleep
 	patchCall(0x0054310A + 5, &initManager);
 
-	//patchByte(0x004c126f, 0x75);
-	//patchByte(0x004c126f + 1, 0x0a);
-
-	//patchThisToCdecl((void *)0x0040db20, &initManager);
-	// MOV EAX,0x01 (return 1) NOTE: we're only doing this to be good.  nothing ever reads the return value
-	//patchInst((void *)(0x00543070 + 7), MOVIMM8);
-	//patchByte((void *)(0x00543070 + 8), 0x01);
-	// RET 0x0008 (pop twice, return);
-	//patchByte((void *)(0x00543070 + 9), 0xC2);
-	//patchByte((void *)(0x00543070 + 10), 0x08);
-	//patchByte((void *)(0x00543070 + 11), 0x00);
-	//patchNop(0x0040db20, 12);  // function that must be called
-
-	// patch keyboard input
-	/*patchNop((void *)0x00403c66, 6);
-	patchCall((void *)0x00403c66, &getVKeyboardState);
-
-	patchNop((void *)0x00403c74, 6);
-	patchCall((void *)0x00403c74, &getShiftCtrlState);
-
-	patchNop((void *)0x00403c85, 6);
-	patchCall((void *)0x00403c85, &getCapsState);
-
-	// always say window is active
-	patchNop((void *)0x004090b0, 5);
-	patchInst((void *)0x004090b0, MOVIMM8);
-	patchByte((void *)(0x004090b0 + 1), 0x01);
-
-	//patchByte((void *)0x00403d90, 0x74);
-
-	// park editor call.  this one's weird
-	//patchDWord((void *)0x00461608, (uint32_t)getShiftCtrlState);
-
-	// use our own cursor logic
-	// show cursor
-	patchCall((void *)0x00405780, &setCursorActive);
-	patchByte((void *)(0x00405780 + 5), 0xC3);
-	// hide cursor
-	patchCall((void *)0x004057C0, &setCursorInactive);
-	patchByte((void *)(0x004057C0 + 5), 0xC3);*/
-
+	// patch keyboard input for movies
+	patchNop(0x0042a573, 97);
+	patchCall(0x0042a573, movieKeyboardInput);
+	// TEST AL, AL
+	patchByte(0x0042a573 + 5, 0x84);
+	patchByte(0x0042a573 + 6, 0xc0);
 }

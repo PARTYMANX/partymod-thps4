@@ -138,7 +138,6 @@ void writeConfigValues() {
 	*antialiasing = graphics_settings.antialiasing;
 	*hq_shadows = graphics_settings.hq_shadows;
 	*fog = graphics_settings.fog;
-	printf("Distance fog = %d\n", *fog);
 }
 
 float __cdecl getScreenAngleFactor() {
@@ -197,7 +196,6 @@ void loadSettings() {
 	graphics_settings.antialiasing = getIniBool("Graphics", "AntiAliasing", 0, configFile);
 	graphics_settings.hq_shadows = getIniBool("Graphics", "HQShadows", 0, configFile);
 	graphics_settings.fog = getIniBool("Graphics", "DistanceFog", 0, configFile);
-	printf("Distance fog = %d\n", graphics_settings.fog);
    
 	resX = GetPrivateProfileInt("Graphics", "ResolutionX", 640, configFile);
 	resY = GetPrivateProfileInt("Graphics", "ResolutionY", 480, configFile);

@@ -32,7 +32,7 @@ int main(int argc, char **argv) {
 
 			// check input crc (not using the one in the bps due to multiple valid executables)
 			uint32_t inputcrc = crc32(buffer, filesize);
-			if (inputcrc != 0xd2c18c0f) {
+			if (inputcrc != 0xd2c18c0f && inputcrc != 0xe7af286f) {
 				printf("INPUT CRC DOES NOT MATCH EXPECTED: %08x\n", inputcrc);
 				printf("Patch Failed!\n");
 			}
@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
 
 			// check crc (again, not using the one in the bps due to multiple valid executables)
 			uint32_t outputcrc = crc32(patchedBuffer, patchedLen);
-			if (outputcrc != 0x528cf068) {
+			if (outputcrc != 0x528cf068 && outputcrc != 0x3e9468b8) {
 				printf("OUTPUT CRC DOES NOT MATCH EXPECTED: %08x\n", outputcrc);
 				printf("Patch Failed!\n");
 
