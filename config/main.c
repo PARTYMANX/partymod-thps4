@@ -847,25 +847,25 @@ void updateSettingsPage() {
 	Button_SetCheck(settingsPage.introCheckbox, (settings.playIntro) ? BST_CHECKED : BST_UNCHECKED);
 }
 
-#define FIELD_OLLIE 0x8801
-#define FIELD_GRAB 0x8802
-#define FIELD_FLIP 0x8803
-#define FIELD_GRIND 0x8804
-#define FIELD_SPINL 0x8805
-#define FIELD_SPINR 0x8806
-#define FIELD_NOLLIE 0x8807
-#define FIELD_SWITCH 0x8808
-#define FIELD_PAUSE 0x8809
-#define FIELD_FORWARD 0x880a
-#define FIELD_BACKWARD 0x880b
-#define FIELD_LEFT 0x880c
-#define FIELD_RIGHT 0x880d
-#define FIELD_CAMUP 0x880e
-#define FIELD_CAMDOWN 0x880f
-#define FIELD_CAMLEFT 0x8810
-#define FIELD_CAMRIGHT 0x8811
-#define FIELD_VIEWTOGGLE 0x8812
-#define FIELD_SWIVELLOCK 0x8813
+#define FIELD_OLLIE 0x9001
+#define FIELD_GRAB 0x9002
+#define FIELD_FLIP 0x9003
+#define FIELD_GRIND 0x9004
+#define FIELD_SPINL 0x9005
+#define FIELD_SPINR 0x9006
+#define FIELD_NOLLIE 0x9007
+#define FIELD_SWITCH 0x9008
+#define FIELD_PAUSE 0x9009
+#define FIELD_FORWARD 0x900a
+#define FIELD_BACKWARD 0x900b
+#define FIELD_LEFT 0x900c
+#define FIELD_RIGHT 0x900d
+#define FIELD_CAMUP 0x900e
+#define FIELD_CAMDOWN 0x900f
+#define FIELD_CAMLEFT 0x9010
+#define FIELD_CAMRIGHT 0x9011
+#define FIELD_VIEWTOGGLE 0x9012
+#define FIELD_SWIVELLOCK 0x9013
 
 void setAllBindText() {
 	setBindText(keyboardPage.ollieBox, keybinds.ollie);
@@ -1116,23 +1116,23 @@ HWND createKeyboardPage(HWND parent, HINSTANCE hinst, RECT rect) {
 	return result;
 }
 
-#define COMBOBOX_OLLIE 0x8801
-#define COMBOBOX_GRAB 0x8802
-#define COMBOBOX_FLIP 0x8803
-#define COMBOBOX_GRIND 0x8804
-#define COMBOBOX_SPINL 0x8805
-#define COMBOBOX_SPINR 0x8806
-#define COMBOBOX_NOLLIE 0x8807
-#define COMBOBOX_SWITCH 0x8808
-#define COMBOBOX_PAUSE 0x8809
-#define COMBOBOX_FORWARD 0x880a
-#define COMBOBOX_BACKWARD 0x880b
-#define COMBOBOX_LEFT 0x880c
-#define COMBOBOX_RIGHT 0x880d
-#define COMBOBOX_MOVESTICK 0x880e
-#define COMBOBOX_CAMSTICK 0x880f
-#define COMBOBOX_VIEWTOGGLE 0x8810
-#define COMBOBOX_SWIVELLOCK 0x8811
+#define COMBOBOX_OLLIE 0x8901
+#define COMBOBOX_GRAB 0x8902
+#define COMBOBOX_FLIP 0x8903
+#define COMBOBOX_GRIND 0x8904
+#define COMBOBOX_SPINL 0x8905
+#define COMBOBOX_SPINR 0x8906
+#define COMBOBOX_NOLLIE 0x8907
+#define COMBOBOX_SWITCH 0x8908
+#define COMBOBOX_PAUSE 0x8909
+#define COMBOBOX_FORWARD 0x890a
+#define COMBOBOX_BACKWARD 0x890b
+#define COMBOBOX_LEFT 0x890c
+#define COMBOBOX_RIGHT 0x890d
+#define COMBOBOX_MOVESTICK 0x890e
+#define COMBOBOX_CAMSTICK 0x890f
+#define COMBOBOX_VIEWTOGGLE 0x8910
+#define COMBOBOX_SWIVELLOCK 0x8911
 
 setButtonBindBox(HWND box, controllerButton bind) {
 	int sel = 0;
@@ -1662,7 +1662,7 @@ LRESULT CALLBACK wndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 	return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
-int main(int argc, char **argv) {
+/*int main(int argc, char **argv) {
 	HINSTANCE hinst = GetModuleHandle(NULL);
 
 	INITCOMMONCONTROLSEX icex;
@@ -1714,6 +1714,714 @@ int main(int argc, char **argv) {
 	setAllPadBindText();
 
 	ShowWindow(windowHwnd, SW_NORMAL);
+
+	// Run the message loop.
+
+	MSG msg;
+	while (GetMessage(&msg, NULL, 0, 0) > 0)
+	{
+		TranslateMessage(&msg);
+		DispatchMessage(&msg);
+	}
+
+	return 0;
+}*/
+
+// start new code here:
+
+// gui library:
+
+/*
+	ui lib architecture:
+
+	windows wants everything in one handler so let's build a hierarchy
+
+	window struct:
+
+	window {
+		HWND hwnd;
+		int width, height;
+		size_t numControls;
+		control **controls;
+	}
+
+
+	wndproc:
+		pass message to each control
+
+	control struct to be punned into what we want
+	control {
+		controlType type;
+		int id;
+		HWND hwnd;
+		size_t numChildren;
+		control **children;
+		// extra stuff goes here
+	}	
+
+	controls:
+	group box
+	tabs
+
+	how i want this interface to work:
+
+	button_create(x, y, w, h, parent, callback, callback_data, text);
+	combobox_create(x, y, w, h, parent, callback, callback_data, contents);
+
+	window should probably be a control of its own to complete the hierarchy
+*/
+
+#pragma comment(linker,"\"/manifestdependency:type='win32' \
+name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
+processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
+
+typedef void (*control_callback)(void *);
+typedef void (*control_value_callback)(int, void *);
+
+typedef enum {
+	PGUI_CONTROL_TYPE_WINDOW,
+	PGUI_CONTROL_TYPE_EMPTY,
+	PGUI_CONTROL_TYPE_BUTTON,
+	PGUI_CONTROL_TYPE_CHECKBOX,
+	PGUI_CONTROL_TYPE_COMBOBOX,
+	PGUI_CONTROL_TYPE_GROUPBOX,
+	PGUI_CONTROL_TYPE_TABS,
+	PGUI_CONTROL_TYPE_TEXTBOX,
+	PGUI_CONTROL_TYPE_LABEL,
+} pgui_controltype;
+
+typedef struct {
+	int current_id;
+} pgui_control_window;
+
+typedef struct {
+	control_callback onPressed;
+	void *onPressedData;
+} pgui_control_button;
+
+typedef struct {
+	control_value_callback on_toggle;
+	void *on_toggle_data;
+} pgui_control_checkbox;
+
+typedef struct {
+	control_value_callback on_select;
+	void *on_select_data;
+} pgui_control_combobox;
+
+typedef struct pgui_control {
+	pgui_controltype type;
+	int id;
+	HWND hwnd;
+	size_t num_children;
+	size_t children_size;
+	struct pgui_control **children;
+	struct pgui_control *parent;
+	union {
+		pgui_control_window window;
+		pgui_control_button button;
+		pgui_control_checkbox checkbox;
+		pgui_control_combobox combobox;
+	};
+} pgui_control;
+
+int pgui_initialized = 0;
+size_t num_windows = 0;
+size_t window_list_size = 0;
+pgui_control **window_list = NULL;
+
+HINSTANCE hinst;
+// HFONT hfont;	// i htink??
+
+LRESULT pgui_control_wndproc(pgui_control *control, HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+
+void pgui_add_child(pgui_control *parent, pgui_control *child) {
+	if (!parent->children) {
+		parent->children = malloc(sizeof(pgui_control *));
+
+		parent->children_size = 1;
+	} else if (parent->children_size <= parent->num_children) {
+		parent->children = realloc(parent->children, sizeof(pgui_control *) * (parent->children_size + 1));
+
+		parent->children_size += 1;
+	}
+
+	parent->children[parent->num_children] = child;
+
+	parent->num_children++;
+
+	for (int i = 0; i < parent->num_children; i++) {
+		printf("TEST: 0x%08x\n", parent->children[i]);
+	}
+	printf("\n");
+}
+
+LRESULT CALLBACK pgui_wndproc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+
+	// find hwnd in window list
+	pgui_control *self = NULL;
+
+	for (int i = 0; i < num_windows; i++) {
+		//printf("hwnd in = 0x%08x, checking 0x%08x\n", hwnd, window_list[i].hwnd);
+		if (window_list[i]->hwnd == hwnd) {
+			//printf("window found!");
+			self = window_list[i];
+			break;
+		}
+	}
+	
+	switch (uMsg) {
+		case WM_DESTROY: {
+			PostQuitMessage(0);
+			return 0;
+		}
+		case WM_PAINT: {
+			PAINTSTRUCT ps;
+			HDC hdc = BeginPaint(hwnd, &ps);
+
+			// All painting occurs here, between BeginPaint and EndPaint.
+
+			FillRect(hdc, &ps.rcPaint, (HBRUSH) (COLOR_WINDOW));
+
+			EndPaint(hwnd, &ps);
+
+			return 0;
+		}
+	}
+
+	if (self) {
+		pgui_control_wndproc(self, hwnd, uMsg, wParam, lParam);
+	}
+
+	return DefWindowProc(hwnd, uMsg, wParam, lParam);
+}
+
+pgui_control *pgui_window_create(int width, int height, char *title) {	// TODO: window styling
+	pgui_control *result = malloc(sizeof(pgui_control));
+	result->type = PGUI_CONTROL_TYPE_WINDOW;
+	result->id = 0;
+	result->num_children = 0;
+	result->children = NULL;
+	result->parent = NULL;
+	result->window.current_id = 0x8800;
+
+	HINSTANCE hinst = GetModuleHandle(NULL);
+
+	const wchar_t CLASS_NAME[]  = L"PGUI Window Class";
+
+	if (!pgui_initialized) {
+		INITCOMMONCONTROLSEX icex;
+		icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
+		icex.dwICC = ICC_TAB_CLASSES;
+		InitCommonControlsEx(&icex);
+
+		LOGFONT lf;
+		GetObject (GetStockObject(DEFAULT_GUI_FONT), sizeof(LOGFONT), &lf); 
+		hfont = CreateFont (lf.lfHeight, lf.lfWidth, 
+			lf.lfEscapement, lf.lfOrientation, lf.lfWeight, 
+			lf.lfItalic, lf.lfUnderline, lf.lfStrikeOut, lf.lfCharSet, 
+			lf.lfOutPrecision, lf.lfClipPrecision, lf.lfQuality, 
+			lf.lfPitchAndFamily, lf.lfFaceName); 
+
+		WNDCLASS wc = { 0,
+			pgui_wndproc,
+			0,
+			0,
+			hinst,
+			NULL,
+			NULL,
+			NULL,
+			NULL,
+			CLASS_NAME
+		};
+
+		RegisterClass(&wc);
+	}
+
+	result->hwnd = CreateWindow(CLASS_NAME, title, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, CW_USEDEFAULT, CW_USEDEFAULT, width, height, NULL, NULL, hinst, NULL);
+	SendMessage(result->hwnd, WM_SETFONT, (WPARAM)hfont, TRUE);
+
+	// todo: add window to window list, return window
+	if (!window_list) {
+		window_list = malloc(sizeof(pgui_control *));
+
+		window_list_size = 1;
+	} else if (window_list_size == num_windows) {
+		window_list = realloc(window_list, sizeof(pgui_control *) * (window_list_size + 1));
+
+		window_list_size += 1;
+	}
+
+	window_list[num_windows] = result;
+	num_windows += 1;
+
+	return result;
+}
+
+void pgui_window_show(pgui_control *control) {
+	ShowWindow(control->hwnd, SW_NORMAL);
+}
+
+LRESULT pgui_button_wndproc(pgui_control *control, HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+	switch (uMsg) {
+		case WM_COMMAND: {
+			//printf("COMMAND CHILD!!! LO: %d, HI: %d, L: %d\n", LOWORD(wParam), HIWORD(wParam), lParam);
+			int controlId = LOWORD(wParam);
+
+			if (controlId == control->id && control->button.onPressed) {
+				control->button.onPressed(control->button.onPressedData);	// maybe pass in self?
+			}
+
+			return 0;
+		}
+	}
+}
+
+pgui_control *pgui_button_create(int x, int y, int w, int h, char *label, pgui_control *parent) {	// TODO: window styling
+	pgui_control *result = malloc(sizeof(pgui_control));
+	result->type = PGUI_CONTROL_TYPE_BUTTON;
+	result->num_children = 0;
+	result->children = NULL;
+	result->parent = parent;
+
+	result->button.onPressed = NULL;
+	result->button.onPressedData = NULL;
+
+	pgui_add_child(parent, result);
+
+	RECT wndRect;
+	//GetClientRect(parent, &wndRect);
+
+	wndRect.left = x;
+	wndRect.right = x + w;
+	wndRect.top = y + h;
+	wndRect.bottom = y;
+
+	// get window hwnd
+	pgui_control *node = parent;
+	while (node->parent) {
+		node = node->parent;
+	}
+
+	result->id = node->window.current_id;
+
+	result->hwnd = CreateWindow(WC_BUTTON, label, WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON, x, y, w, h, node->hwnd, node->window.current_id, hinst, NULL);
+	SendMessage(result->hwnd, WM_SETFONT, (WPARAM)hfont, TRUE);
+
+	// reorder parent(s) probably?  need to remember how win32 orders things
+
+	node->window.current_id += 1;
+
+	return result;
+}
+
+void pgui_button_set_on_press(pgui_control *control, control_callback on_pressed, void *data) {
+	control->button.onPressed = on_pressed;
+	control->button.onPressedData = data;
+}
+
+LRESULT pgui_checkbox_wndproc(pgui_control *control, HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+	switch (uMsg) {
+		case WM_COMMAND: {
+			//printf("COMMAND CHILD!!! LO: %d, HI: %d, L: %d\n", LOWORD(wParam), HIWORD(wParam), lParam);
+			int controlId = LOWORD(wParam);
+
+			if (controlId == control->id && control->checkbox.on_toggle) {
+				int checkstate = SendMessage(control->hwnd, BM_GETCHECK, 0, 0) == BST_CHECKED;
+
+				if (checkstate) {
+					SendMessage(control->hwnd, BM_SETCHECK, BST_UNCHECKED, 0);
+				} else {
+					SendMessage(control->hwnd, BM_SETCHECK, BST_CHECKED, 0);
+				}
+
+				control->checkbox.on_toggle(!checkstate, control->checkbox.on_toggle_data);	// maybe pass in self?
+			}
+
+			return 0;
+		}
+	}
+}
+
+pgui_control *pgui_checkbox_create(int x, int y, int w, int h, char *label, pgui_control *parent) {	// TODO: window styling
+	pgui_control *result = malloc(sizeof(pgui_control));
+	result->type = PGUI_CONTROL_TYPE_CHECKBOX;
+	result->num_children = 0;
+	result->children = NULL;
+	result->parent = parent;
+
+	result->checkbox.on_toggle = NULL;
+	result->checkbox.on_toggle_data = NULL;
+
+	pgui_add_child(parent, result);
+
+	RECT wndRect;
+	//GetClientRect(parent, &wndRect);
+
+	wndRect.left = x;
+	wndRect.right = x + w;
+	wndRect.top = y + h;
+	wndRect.bottom = y;
+
+	// get window hwnd
+	pgui_control *node = parent;
+	while (node->parent) {
+		node = node->parent;
+	}
+
+	result->id = node->window.current_id;
+
+	result->hwnd = CreateWindow(WC_BUTTON, label, WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_CHECKBOX, x, y, w, h, node->hwnd, node->window.current_id, hinst, NULL);
+	SendMessage(result->hwnd, WM_SETFONT, (WPARAM)hfont, TRUE);
+
+	// reorder parent(s) probably?  need to remember how win32 orders things
+
+	node->window.current_id += 1;
+
+	return result;
+}
+
+void pgui_checkbox_set_on_toggle(pgui_control *control, control_value_callback on_toggle, void *data) {
+	control->checkbox.on_toggle = on_toggle;
+	control->checkbox.on_toggle_data = data;
+}
+
+pgui_control *pgui_label_create(int x, int y, int w, int h, char *label, pgui_control *parent) {	// todo: positioning (center, left, etc)
+	pgui_control *result = malloc(sizeof(pgui_control));
+	result->type = PGUI_CONTROL_TYPE_LABEL;
+	result->num_children = 0;
+	result->children = NULL;
+	result->parent = parent;
+
+	pgui_add_child(parent, result);
+
+	RECT wndRect;
+	//GetClientRect(parent, &wndRect);
+
+	wndRect.left = x;
+	wndRect.right = x + w;
+	wndRect.top = y + h;
+	wndRect.bottom = y;
+
+	// get window hwnd
+	pgui_control *node = parent;
+	while (node->parent) {
+		node = node->parent;
+	}
+
+	result->hwnd = CreateWindow(WC_STATIC, label, WS_CHILD | WS_CLIPSIBLINGS | WS_VISIBLE | SS_CENTER, x, y, w, h, node->hwnd, NULL, hinst, NULL);
+	SendMessage(result->hwnd, WM_SETFONT, (WPARAM)hfont, TRUE);
+
+	// reorder parent(s) probably?  need to remember how win32 orders things
+
+	return result;
+}
+
+pgui_control *pgui_groupbox_create(int x, int y, int w, int h, char *label, pgui_control *parent) {	// todo: positioning (center, left, etc)
+	pgui_control *result = malloc(sizeof(pgui_control));
+	result->type = PGUI_CONTROL_TYPE_GROUPBOX;
+	result->num_children = 0;
+	result->children = NULL;
+	result->parent = parent;
+
+	pgui_add_child(parent, result);
+
+	RECT wndRect;
+	//GetClientRect(parent, &wndRect);
+
+	wndRect.left = x;
+	wndRect.right = x + w;
+	wndRect.top = y + h;
+	wndRect.bottom = y;
+
+	// get window hwnd
+	pgui_control *node = parent;
+	while (node->parent) {
+		node = node->parent;
+	}
+
+	result->hwnd = CreateWindow(WC_BUTTON, label, WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_GROUPBOX, x, y, w, h, node->hwnd, NULL, hinst, NULL);
+	SendMessage(result->hwnd, WM_SETFONT, (WPARAM)hfont, TRUE);
+
+	// reorder parent(s) probably?  need to remember how win32 orders things
+
+	return result;
+}
+
+pgui_control *pgui_textbox_create(int x, int y, int w, int h, char *text, pgui_control *parent) {	// todo: positioning (center, left, etc)
+	pgui_control *result = malloc(sizeof(pgui_control));
+	result->type = PGUI_CONTROL_TYPE_TEXTBOX;
+	result->num_children = 0;
+	result->children = NULL;
+	result->parent = parent;
+
+	pgui_add_child(parent, result);
+
+	RECT wndRect;
+	//GetClientRect(parent, &wndRect);
+
+	wndRect.left = x;
+	wndRect.right = x + w;
+	wndRect.top = y + h;
+	wndRect.bottom = y;
+
+	// get window hwnd
+	pgui_control *node = parent;
+	while (node->parent) {
+		node = node->parent;
+	}
+
+	result->id = node->window.current_id;
+
+	result->hwnd = CreateWindowEx(WS_EX_CLIENTEDGE, WC_EDIT, text, WS_CHILD | WS_CLIPSIBLINGS | WS_VISIBLE, x, y, w, h, node->hwnd, (HMENU)node->window.current_id, hinst, NULL);
+	SendMessage(result->hwnd, WM_SETFONT, (WPARAM)hfont, TRUE);
+
+	// reorder parent(s) probably?  need to remember how win32 orders things
+
+	node->window.current_id += 1;
+
+	return result;
+}
+
+LRESULT pgui_textbox_wndproc(pgui_control *control, HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+	switch (uMsg) {
+		case WM_COMMAND: {
+			int controlId = LOWORD(wParam);
+			int controlCode = HIWORD(wParam);
+
+			if (controlId == control->id) {
+				if (controlCode == EN_SETFOCUS) {
+
+				}
+				if (controlCode == EN_KILLFOCUS) {
+					char entryBuffer[16];
+					Edit_GetText(settingsPage.customResolutionXBox, entryBuffer, 16);
+					settings.resX = atoi(entryBuffer);
+
+					if (settings.resX < 320) {
+						settings.resX = 320;
+					}
+
+					itoa(settings.resX, entryBuffer, 10);
+					Edit_SetText(settingsPage.customResolutionXBox, entryBuffer);
+				}
+			}
+
+			return 0;
+		}
+	}
+}
+
+pgui_control *pgui_combobox_create(int x, int y, int w, int h, char **options, size_t num_options, pgui_control *parent) {	// todo: positioning (center, left, etc)
+	pgui_control *result = malloc(sizeof(pgui_control));
+	result->type = PGUI_CONTROL_TYPE_COMBOBOX;
+	result->num_children = 0;
+	result->children = NULL;
+	result->parent = parent;
+
+	pgui_add_child(parent, result);
+
+	RECT wndRect;
+	//GetClientRect(parent, &wndRect);
+
+	wndRect.left = x;
+	wndRect.right = x + w;
+	wndRect.top = y + h;
+	wndRect.bottom = y;
+
+	// get window hwnd
+	pgui_control *node = parent;
+	while (node->parent) {
+		node = node->parent;
+	}
+
+	result->id = node->window.current_id;
+
+	result->hwnd = CreateWindow(WC_COMBOBOX, "", WS_TABSTOP | WS_VISIBLE | WS_CHILD | CBS_DROPDOWNLIST, x, y, w, h, node->hwnd, node->window.current_id, hinst, NULL);
+	SendMessage(result->hwnd, WM_SETFONT, (WPARAM)hfont, TRUE);
+
+	for (int i = 0; i < num_options; i++) {
+		ComboBox_AddString(result->hwnd, options[i]);
+	}
+
+	ComboBox_SetCurSel(result->hwnd, 0);
+
+	// reorder parent(s) probably?  need to remember how win32 orders things
+
+	node->window.current_id += 1;
+
+	return result;
+}
+
+LRESULT pgui_combobox_wndproc(pgui_control *control, HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+	switch (uMsg) {
+		case WM_COMMAND: {
+			int controlId = LOWORD(wParam);
+			int controlCode = HIWORD(wParam);
+
+			if (controlId == control->id) {
+				if (controlCode == 1) {
+					int idx = ComboBox_GetCurSel(lParam);
+					control->combobox.on_select(idx, control->combobox.on_select_data);
+				}
+			}
+
+			return 0;
+		}
+	}
+}
+
+void pgui_combobox_set_on_select(pgui_control *control, control_value_callback on_select, void *data) {
+	control->combobox.on_select = on_select;
+	control->combobox.on_select_data = data;
+}
+
+pgui_control *pgui_tabs_create(int x, int y, int w, int h, char **options, size_t num_options, pgui_control *parent) {	// todo: positioning (center, left, etc)
+	pgui_control *result = malloc(sizeof(pgui_control));
+	result->type = PGUI_CONTROL_TYPE_TABS;
+	result->num_children = 0;
+	result->children = NULL;
+	result->parent = parent;
+
+	pgui_add_child(parent, result);
+
+	RECT wndRect;
+	//GetClientRect(parent, &wndRect);
+
+	wndRect.left = x;
+	wndRect.right = x + w;
+	wndRect.top = y + h;
+	wndRect.bottom = y;
+
+	// get window hwnd
+	pgui_control *node = parent;
+	while (node->parent) {
+		node = node->parent;
+	}
+
+	result->id = node->window.current_id;
+
+	result->hwnd = CreateWindow(WC_TABCONTROL, "", WS_CHILD | WS_CLIPSIBLINGS | WS_VISIBLE, x, y, w, h, node->hwnd, node->window.current_id, hinst, NULL);
+	SendMessage(result->hwnd, WM_SETFONT, (WPARAM)hfont, TRUE);
+
+	for (int i = 0; i < num_options; i++) {
+		TCITEM item;
+		item.mask = TCIF_TEXT | TCIF_IMAGE;
+		item.iImage = -1;
+	
+		item.pszText = options[i];
+		TabCtrl_InsertItem(result->hwnd, i, &item);
+	}
+
+	ComboBox_SetCurSel(result->hwnd, 0);
+
+	//RECT tabRect;
+	//GetClientRect(result, &tabRect);
+	//TabCtrl_AdjustRect(result, FALSE, &tabRect);
+
+	// reorder parent(s) probably?  need to remember how win32 orders things
+
+	node->window.current_id += 1;
+
+	return result;
+}
+
+LRESULT pgui_tabs_wndproc(pgui_control *control, HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+	switch (uMsg) {
+		case WM_NOTIFY: {
+			int controlCode = ((LPNMHDR)lParam)->code;
+			int controlId = ((LPNMHDR)lParam)->idFrom;
+
+			if (controlId == control->id) {
+				if (controlCode == TCN_SELCHANGE) {
+					int tab = TabCtrl_GetCurSel(((LPNMHDR)lParam)->hwndFrom);
+					printf("changing tab to %d!!\n", tab);
+					// hide all children on current tab
+					// show all children on new tab
+					// set current tab to new tab
+				}
+			}
+
+			return 0;
+		}
+	}
+}
+
+LRESULT pgui_control_wndproc(pgui_control *control, HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+	switch(control->type) {
+		case PGUI_CONTROL_TYPE_BUTTON:
+			pgui_button_wndproc(control, hwnd, uMsg, wParam, lParam);
+			break;
+		case PGUI_CONTROL_TYPE_CHECKBOX:
+			pgui_checkbox_wndproc(control, hwnd, uMsg, wParam, lParam);
+			break;
+		case PGUI_CONTROL_TYPE_TEXTBOX:
+			pgui_textbox_wndproc(control, hwnd, uMsg, wParam, lParam);
+			break;
+		case PGUI_CONTROL_TYPE_COMBOBOX:
+			pgui_combobox_wndproc(control, hwnd, uMsg, wParam, lParam);
+			break;
+		case PGUI_CONTROL_TYPE_TABS:
+			pgui_tabs_wndproc(control, hwnd, uMsg, wParam, lParam);
+			break;
+		default:
+			break;
+	}
+
+	for (int i = 0; i < control->num_children; i++) {
+		pgui_control_wndproc(control->children[i], hwnd, uMsg, wParam, lParam);
+	}
+
+	return 0;
+}
+
+void test_press(void *data) {
+	printf("HELLO!!\n");
+}
+
+void test_press_2(void *data) {
+	printf("OKAY!\n");
+}
+
+void test_check(int is_checked, void *data) {
+	printf("IS CHECKED: %d\n", is_checked);
+}
+
+void test_combobox(int selection, void *data) {
+	printf("COMBOBOX SELECTION: %d\n", selection);
+}
+
+char *selections[3] = {
+	"One!", 
+	"Two!",
+	"Three!"
+};
+
+int main(int argc, char **argv) {
+	
+	pgui_control *window = pgui_window_create(640, 480, "Config!!");
+	
+	pgui_control *button = pgui_button_create(10, 10, 100, 100, "Test", window);
+	pgui_button_set_on_press(button, test_press, NULL);
+
+	pgui_control *button2 = pgui_button_create(120, 10, 100, 100, "Test2", window);
+	pgui_button_set_on_press(button2, test_press_2, NULL);
+
+	pgui_control *checkbox = pgui_checkbox_create(10, 120, 100, 16, "Checkbox!!", window);
+	pgui_checkbox_set_on_toggle(checkbox, test_check, NULL);
+
+	pgui_label_create(10, 140, 100, 16, "Label!", window);
+
+	pgui_groupbox_create(10, 160, 100, 100, "Groupbox!", window);
+
+	pgui_textbox_create(10, 280, 200, 20, "Textbox!", window);
+
+	pgui_control *combobox = pgui_combobox_create(10, 320, 200, 20, selections, 3, window);
+	pgui_combobox_set_on_select(combobox, test_combobox, NULL);
+
+	pgui_control *tabs = pgui_tabs_create(10, 360, 400, 100, selections, 3, window);
+	
+	pgui_window_show(window);
 
 	// Run the message loop.
 
