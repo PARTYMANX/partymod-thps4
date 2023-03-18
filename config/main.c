@@ -3,6 +3,7 @@
 #include <Windows.h>
 #include <windowsx.h>
 #include <CommCtrl.h>
+#include <uxtheme.h>
 
 #include <SDL2/SDL.h>
 
@@ -1809,12 +1810,26 @@ typedef struct {
 	void *on_select_data;
 } pgui_control_combobox;
 
+typedef struct {
+	int num_tabs;
+	int current_tab;
+	HBRUSH brush;	// used for drawing; brush with the tab's visuals
+} pgui_control_tabs;
+
 typedef struct pgui_control {
 	pgui_controltype type;
 	int id;
 	HWND hwnd;
 	size_t num_children;
 	size_t children_size;
+
+	int x;
+	int y;
+	int w;
+	int h;
+
+	int hidden;
+
 	struct pgui_control **children;
 	struct pgui_control *parent;
 	union {
@@ -1822,6 +1837,7 @@ typedef struct pgui_control {
 		pgui_control_button button;
 		pgui_control_checkbox checkbox;
 		pgui_control_combobox combobox;
+		pgui_control_tabs tabs;
 	};
 } pgui_control;
 
@@ -1849,11 +1865,49 @@ void pgui_add_child(pgui_control *parent, pgui_control *child) {
 	parent->children[parent->num_children] = child;
 
 	parent->num_children++;
+}
 
-	for (int i = 0; i < parent->num_children; i++) {
-		printf("TEST: 0x%08x\n", parent->children[i]);
+void pgui_control_hide(pgui_control *control, int hidden) {
+	if (!hidden || !control->hidden) {
+		ShowWindow(control->hwnd, !hidden);
+	} else {
+		ShowWindow(control->hwnd, 0);
 	}
-	printf("\n");
+
+	for (int i = 0; i < control->num_children; i++) {
+		pgui_control_hide(control->children[i], hidden);
+	}
+}
+
+void pgui_control_set_hidden(pgui_control *control, int hidden) {
+	control->hidden = hidden;
+
+	pgui_control_hide(control, hidden);
+}
+
+void pgui_get_hierarchy_position(pgui_control *control, int *x, int *y) {
+	if (control->parent) {
+		*x += control->parent->x;
+		*y += control->parent->y;
+		pgui_get_hierarchy_position(control->parent, x, y);
+	}
+}
+
+pgui_control *findControl(pgui_control *control, HWND target) {
+	if (control->hwnd == target) {
+		return control;
+	} else if (control->num_children == 0) {
+		return NULL;
+	}
+
+	for (int i = 0; i < control->num_children; i++) {
+		pgui_control *result = findControl(control->children[i], target);
+		if (result) {
+			return result;
+		}
+	}
+
+	return NULL;
 }
 
 LRESULT CALLBACK pgui_wndproc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
@@ -1887,6 +1941,63 @@ LRESULT CALLBACK pgui_wndproc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam
 
 			return 0;
 		}
+		//case WM_CTLCOLORSTATIC: {
+			//HDC hEdit = (HDC)wParam;
+           // SetBkMode(hEdit, OPAQUE);
+            //SetTextColor(hEdit, RGB(0, 0, 0));
+            //SetBkColor(hEdit, RGB(255, 255, 255));
+            // Do not return a brush created by CreateSolidBrush(...) because you'll get a memory leak
+           //return 1;
+		//}
+		case WM_CTLCOLOR:
+		case WM_CTLCOLORBTN:
+		case WM_CTLCOLORSTATIC: {
+			if (self) {
+				// find this control
+				pgui_control *child_control = findControl(self, (HWND)lParam);
+				
+				if (child_control) {
+					// find parent tab if it exists
+					pgui_control *parent_tab = child_control->parent;
+					while (parent_tab && parent_tab->type != PGUI_CONTROL_TYPE_TABS) {
+						parent_tab = parent_tab->parent;
+					}
+
+					if (parent_tab) {
+						// create a brush that copies the tab's body 
+						if (!parent_tab->tabs.brush) {
+							RECT rc;
+
+							GetWindowRect(parent_tab->hwnd, &rc);
+							HDC hdc = GetDC(parent_tab->hwnd);
+							HDC hdc_new = CreateCompatibleDC(hdc);	// create a new device context to draw our tab into
+							HBITMAP hbmp = CreateCompatibleBitmap(hdc, rc.right - rc.left, rc.bottom - rc.top);	// create a new bitmap to draw the tab into
+							HBITMAP hbmp_old = (HBITMAP)(SelectObject(hdc_new, hbmp));	// replace the device context's bitmap with our new bitmap
+
+							SendMessage(parent_tab->hwnd, WM_PRINTCLIENT, hdc_new, (LPARAM)(PRF_ERASEBKGND | PRF_CLIENT | PRF_NONCLIENT));	// draw the tab into our bitmap
+							parent_tab->tabs.brush = CreatePatternBrush(hbmp);	// create a brush from the bitmap
+							SelectObject(hdc_new, hbmp_old);	// replace the bitmap in the device context
+
+							DeleteObject(hbmp);
+							DeleteDC(hdc_new);
+							ReleaseDC(parent_tab->hwnd, hdc);
+						}
+
+						// use our previously created brush as a background for the control
+						RECT rc2;
+
+						HDC hEdit = (HDC)wParam;
+						SetBkMode(hEdit, TRANSPARENT);
+
+						GetWindowRect((HWND)lParam, &rc2);	// get control's position
+						MapWindowPoints(NULL, parent_tab->hwnd, (LPPOINT)(&rc2), 2);	// convert coordinates into tab's space
+						SetBrushOrgEx(hEdit, -rc2.left, -rc2.top, NULL);	// set brush origin to our control's position
+
+						return parent_tab->tabs.brush;
+					}
+				}
+			}
+		}
 	}
 
 	if (self) {
@@ -1896,6 +2007,8 @@ LRESULT CALLBACK pgui_wndproc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam
 	return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
+#pragma comment( lib, "comctl32.lib" )
+
 pgui_control *pgui_window_create(int width, int height, char *title) {	// TODO: window styling
 	pgui_control *result = malloc(sizeof(pgui_control));
 	result->type = PGUI_CONTROL_TYPE_WINDOW;
@@ -1904,6 +2017,10 @@ pgui_control *pgui_window_create(int width, int height, char *title) {	// TODO: 
 	result->children = NULL;
 	result->parent = NULL;
 	result->window.current_id = 0x8800;
+	result->x = 0;
+	result->y = 0;
+	result->w = width;
+	result->h = height;
 
 	HINSTANCE hinst = GetModuleHandle(NULL);
 
@@ -1941,6 +2058,14 @@ pgui_control *pgui_window_create(int width, int height, char *title) {	// TODO: 
 	result->hwnd = CreateWindow(CLASS_NAME, title, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, CW_USEDEFAULT, CW_USEDEFAULT, width, height, NULL, NULL, hinst, NULL);
 	SendMessage(result->hwnd, WM_SETFONT, (WPARAM)hfont, TRUE);
 
+	  RECT rc_client, rc_window;
+	  POINT pt_diff;
+	  GetClientRect(result->hwnd, &rc_client);
+	  GetWindowRect(result->hwnd, &rc_window);
+	  pt_diff.x = (rc_window.right - rc_window.left) - rc_client.right;
+	  pt_diff.y = (rc_window.bottom - rc_window.top) - rc_client.bottom;
+	  MoveWindow(result->hwnd, rc_window.left, rc_window.top, width + pt_diff.x, height + pt_diff.y, TRUE);
+
 	// todo: add window to window list, return window
 	if (!window_list) {
 		window_list = malloc(sizeof(pgui_control *));
@@ -1960,6 +2085,37 @@ pgui_control *pgui_window_create(int width, int height, char *title) {	// TODO: 
 
 void pgui_window_show(pgui_control *control) {
 	ShowWindow(control->hwnd, SW_NORMAL);
+}
+
+pgui_control *pgui_empty_create(int x, int y, int w, int h, pgui_control *parent) {	// TODO: window styling
+	pgui_control *result = malloc(sizeof(pgui_control));
+	result->type = PGUI_CONTROL_TYPE_EMPTY;
+	result->num_children = 0;
+	result->children = NULL;
+	result->parent = parent;
+
+	pgui_add_child(parent, result);
+
+	result->x = x;
+	result->y = y;
+	result->w = w;
+	result->h = h;
+
+	pgui_get_hierarchy_position(result, &x, &y);
+
+	// get window hwnd
+	pgui_control *node = parent;
+	while (node->parent) {
+		node = node->parent;
+	}
+
+	result->id = 0;
+
+	result->hwnd = NULL;
+
+	// reorder parent(s) probably?  need to remember how win32 orders things
+
+	return result;
 }
 
 LRESULT pgui_button_wndproc(pgui_control *control, HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
@@ -1989,13 +2145,12 @@ pgui_control *pgui_button_create(int x, int y, int w, int h, char *label, pgui_c
 
 	pgui_add_child(parent, result);
 
-	RECT wndRect;
-	//GetClientRect(parent, &wndRect);
+	result->x = x;
+	result->y = y;
+	result->w = w;
+	result->h = h;
 
-	wndRect.left = x;
-	wndRect.right = x + w;
-	wndRect.top = y + h;
-	wndRect.bottom = y;
+	pgui_get_hierarchy_position(result, &x, &y);
 
 	// get window hwnd
 	pgui_control *node = parent;
@@ -2055,13 +2210,12 @@ pgui_control *pgui_checkbox_create(int x, int y, int w, int h, char *label, pgui
 
 	pgui_add_child(parent, result);
 
-	RECT wndRect;
-	//GetClientRect(parent, &wndRect);
+	result->x = x;
+	result->y = y;
+	result->w = w;
+	result->h = h;
 
-	wndRect.left = x;
-	wndRect.right = x + w;
-	wndRect.top = y + h;
-	wndRect.bottom = y;
+	pgui_get_hierarchy_position(result, &x, &y);
 
 	// get window hwnd
 	pgui_control *node = parent;
@@ -2095,13 +2249,12 @@ pgui_control *pgui_label_create(int x, int y, int w, int h, char *label, pgui_co
 
 	pgui_add_child(parent, result);
 
-	RECT wndRect;
-	//GetClientRect(parent, &wndRect);
+	result->x = x;
+	result->y = y;
+	result->w = w;
+	result->h = h;
 
-	wndRect.left = x;
-	wndRect.right = x + w;
-	wndRect.top = y + h;
-	wndRect.bottom = y;
+	pgui_get_hierarchy_position(result, &x, &y);
 
 	// get window hwnd
 	pgui_control *node = parent;
@@ -2109,7 +2262,7 @@ pgui_control *pgui_label_create(int x, int y, int w, int h, char *label, pgui_co
 		node = node->parent;
 	}
 
-	result->hwnd = CreateWindow(WC_STATIC, label, WS_CHILD | WS_CLIPSIBLINGS | WS_VISIBLE | SS_CENTER, x, y, w, h, node->hwnd, NULL, hinst, NULL);
+	result->hwnd = CreateWindow(WC_STATIC, label, WS_CHILD | WS_VISIBLE | SS_CENTER, x, y, w, h, node->hwnd, NULL, hinst, NULL);
 	SendMessage(result->hwnd, WM_SETFONT, (WPARAM)hfont, TRUE);
 
 	// reorder parent(s) probably?  need to remember how win32 orders things
@@ -2126,13 +2279,12 @@ pgui_control *pgui_groupbox_create(int x, int y, int w, int h, char *label, pgui
 
 	pgui_add_child(parent, result);
 
-	RECT wndRect;
-	//GetClientRect(parent, &wndRect);
+	result->x = x;
+	result->y = y;
+	result->w = w;
+	result->h = h;
 
-	wndRect.left = x;
-	wndRect.right = x + w;
-	wndRect.top = y + h;
-	wndRect.bottom = y;
+	pgui_get_hierarchy_position(result, &x, &y);
 
 	// get window hwnd
 	pgui_control *node = parent;
@@ -2157,13 +2309,12 @@ pgui_control *pgui_textbox_create(int x, int y, int w, int h, char *text, pgui_c
 
 	pgui_add_child(parent, result);
 
-	RECT wndRect;
-	//GetClientRect(parent, &wndRect);
+	result->x = x;
+	result->y = y;
+	result->w = w;
+	result->h = h;
 
-	wndRect.left = x;
-	wndRect.right = x + w;
-	wndRect.top = y + h;
-	wndRect.bottom = y;
+	pgui_get_hierarchy_position(result, &x, &y);
 
 	// get window hwnd
 	pgui_control *node = parent;
@@ -2173,7 +2324,7 @@ pgui_control *pgui_textbox_create(int x, int y, int w, int h, char *text, pgui_c
 
 	result->id = node->window.current_id;
 
-	result->hwnd = CreateWindowEx(WS_EX_CLIENTEDGE, WC_EDIT, text, WS_CHILD | WS_CLIPSIBLINGS | WS_VISIBLE, x, y, w, h, node->hwnd, (HMENU)node->window.current_id, hinst, NULL);
+	result->hwnd = CreateWindowEx(WS_EX_CLIENTEDGE, WC_EDIT, text, WS_CHILD | WS_VISIBLE, x, y, w, h, node->hwnd, (HMENU)node->window.current_id, hinst, NULL);
 	SendMessage(result->hwnd, WM_SETFONT, (WPARAM)hfont, TRUE);
 
 	// reorder parent(s) probably?  need to remember how win32 orders things
@@ -2221,13 +2372,12 @@ pgui_control *pgui_combobox_create(int x, int y, int w, int h, char **options, s
 
 	pgui_add_child(parent, result);
 
-	RECT wndRect;
-	//GetClientRect(parent, &wndRect);
+	result->x = x;
+	result->y = y;
+	result->w = w;
+	result->h = h;
 
-	wndRect.left = x;
-	wndRect.right = x + w;
-	wndRect.top = y + h;
-	wndRect.bottom = y;
+	pgui_get_hierarchy_position(result, &x, &y);
 
 	// get window hwnd
 	pgui_control *node = parent;
@@ -2283,15 +2433,18 @@ pgui_control *pgui_tabs_create(int x, int y, int w, int h, char **options, size_
 	result->children = NULL;
 	result->parent = parent;
 
+	result->tabs.current_tab = 0;
+	result->tabs.num_tabs = num_options;
+	result->tabs.brush = NULL;
+
 	pgui_add_child(parent, result);
 
-	RECT wndRect;
-	//GetClientRect(parent, &wndRect);
+	result->x = x;
+	result->y = y;
+	result->w = w;
+	result->h = h;
 
-	wndRect.left = x;
-	wndRect.right = x + w;
-	wndRect.top = y + h;
-	wndRect.bottom = y;
+	pgui_get_hierarchy_position(result, &x, &y);
 
 	// get window hwnd
 	pgui_control *node = parent;
@@ -2301,7 +2454,7 @@ pgui_control *pgui_tabs_create(int x, int y, int w, int h, char **options, size_
 
 	result->id = node->window.current_id;
 
-	result->hwnd = CreateWindow(WC_TABCONTROL, "", WS_CHILD | WS_CLIPSIBLINGS | WS_VISIBLE, x, y, w, h, node->hwnd, node->window.current_id, hinst, NULL);
+	result->hwnd = CreateWindow(WC_TABCONTROL, "", WS_CHILD | WS_VISIBLE, x, y, w, h, node->hwnd, node->window.current_id, hinst, NULL);
 	SendMessage(result->hwnd, WM_SETFONT, (WPARAM)hfont, TRUE);
 
 	for (int i = 0; i < num_options; i++) {
@@ -2315,11 +2468,19 @@ pgui_control *pgui_tabs_create(int x, int y, int w, int h, char **options, size_
 
 	ComboBox_SetCurSel(result->hwnd, 0);
 
-	//RECT tabRect;
-	//GetClientRect(result, &tabRect);
-	//TabCtrl_AdjustRect(result, FALSE, &tabRect);
+	RECT tabRect;
+	GetClientRect(result->hwnd, &tabRect);
+	TabCtrl_AdjustRect(result->hwnd, FALSE, &tabRect);
 
 	// reorder parent(s) probably?  need to remember how win32 orders things
+
+	for (int i = 0; i < num_options; i++) {
+		pgui_empty_create(tabRect.left, tabRect.top, tabRect.right - tabRect.left, tabRect.bottom - tabRect.top, result);
+	}
+
+	for (int i = 1; i < num_options; i++) {
+		pgui_control_set_hidden(result->children[i], 1);
+	}
 
 	node->window.current_id += 1;
 
@@ -2337,8 +2498,13 @@ LRESULT pgui_tabs_wndproc(pgui_control *control, HWND hwnd, UINT uMsg, WPARAM wP
 					int tab = TabCtrl_GetCurSel(((LPNMHDR)lParam)->hwndFrom);
 					printf("changing tab to %d!!\n", tab);
 					// hide all children on current tab
+					pgui_control_set_hidden(control->children[control->tabs.current_tab], 1);
+
 					// show all children on new tab
+					pgui_control_set_hidden(control->children[tab], 0); 
+					
 					// set current tab to new tab
+					control->tabs.current_tab = tab;
 				}
 			}
 
@@ -2397,29 +2563,44 @@ char *selections[3] = {
 	"Three!"
 };
 
+void test_button_tab(void *data) {
+	printf("I'm in a tab!!\n");
+}
+
+void build_general_page(pgui_control *parent) {
+	pgui_control *resolution_groupbox = pgui_groupbox_create(8, 8, parent->w - 8 - 8, (parent->h / 2) - 8 - 4, "Resolution", parent);
+	pgui_control *graphics_groupbox = pgui_groupbox_create(8, (parent->h / 2) + 4, (parent->w / 2) - 8 - 4, (parent->h / 2) - 8 - 4, "Graphics", parent);
+	pgui_control *misc_groupbox = pgui_groupbox_create((parent->w / 2) + 4, (parent->h / 2) + 4, (parent->w / 2) - 8 - 4, (parent->h / 2) - 8 - 4, "Miscellaneous", parent);
+
+	// resolution options
+	char *dummy_res[1] = {
+		"640x480"
+	};
+	pgui_control *resolution_combobox = pgui_combobox_create(8, 16, 128, 24, dummy_res, 1, resolution_groupbox);
+	pgui_control *custom_resolution = pgui_checkbox_create(8, 16 + 24, 128, 24, "Use Custom Resolution", resolution_groupbox);
+
+	pgui_label_create(8 + 8, 16 + (24 * 2), 64, 24, "Width:", resolution_groupbox);
+
+	pgui_control *windowed = pgui_checkbox_create(8, 16 + (24 * 3), 128, 24, "Windowed", resolution_groupbox);
+	pgui_control *borderless = pgui_checkbox_create(8, 16 + (24 * 4), 128, 24, "Borderless", resolution_groupbox);
+}
+
 int main(int argc, char **argv) {
-	
-	pgui_control *window = pgui_window_create(640, 480, "Config!!");
-	
-	pgui_control *button = pgui_button_create(10, 10, 100, 100, "Test", window);
-	pgui_button_set_on_press(button, test_press, NULL);
+	pgui_control *window = pgui_window_create(400, 550, "PARTYMOD Configuration");
 
-	pgui_control *button2 = pgui_button_create(120, 10, 100, 100, "Test2", window);
-	pgui_button_set_on_press(button2, test_press_2, NULL);
+	pgui_control *restore_default_button = pgui_button_create(8, window->h - 42 + 8, 96, 26, "Restore Defaults", window);
+	pgui_control *cancel_button = pgui_button_create(window->w - (88 * 2), window->h - 42 + 8, 80, 26, "Cancel", window);
+	pgui_control *ok_button = pgui_button_create(window->w - 88, window->h - 42 + 8, 80, 26, "OK", window);
 
-	pgui_control *checkbox = pgui_checkbox_create(10, 120, 100, 16, "Checkbox!!", window);
-	pgui_checkbox_set_on_toggle(checkbox, test_check, NULL);
+	char *tab_names[3] = {
+		"General",
+		"Keyboard",
+		"Gamepad",
+	};
 
-	pgui_label_create(10, 140, 100, 16, "Label!", window);
+	pgui_control *tabs = pgui_tabs_create(8, 8 + 96, window->w - 16, window->h - 96 - 8 - 32 - 8, tab_names, 3, window);
 
-	pgui_groupbox_create(10, 160, 100, 100, "Groupbox!", window);
-
-	pgui_textbox_create(10, 280, 200, 20, "Textbox!", window);
-
-	pgui_control *combobox = pgui_combobox_create(10, 320, 200, 20, selections, 3, window);
-	pgui_combobox_set_on_select(combobox, test_combobox, NULL);
-
-	pgui_control *tabs = pgui_tabs_create(10, 360, 400, 100, selections, 3, window);
+	build_general_page(tabs->children[0]);
 	
 	pgui_window_show(window);
 

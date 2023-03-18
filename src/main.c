@@ -419,6 +419,21 @@ void patchCD() {
 	patchByte(0x00543fd0, 0xe9);
 }
 
+
+void patchRenderer() {
+	// remove a big chunk of rendering.  for fun.
+	//patchNop(0x0043dbc2, 37);	// dynamic stuff?  skinned meshes?
+	patchNop(0x0043d6a6, 37);	// world
+
+	//patchNop(0x0043d455, 107 + 6);	// remove world mesh state changes
+
+	//patchNop(0x0043d65b, 60);
+
+	patchNop(0x0043d633, 6);
+
+	patchNop(0x0043bb15, 55);
+}
+
 __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpReserved) {
 	// Perform actions based on the reason for calling.
 	switch(fdwReason) { 
@@ -437,6 +452,8 @@ __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, L
 			patchScriptHook();
 			//patchIsPs2();
 			patchScreenFlash();
+
+			//patchRenderer();
 			
 			//patchPrintf();
 			//patchCD();
