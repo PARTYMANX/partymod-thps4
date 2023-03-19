@@ -299,10 +299,14 @@ void pollController(device *dev, SDL_GameController *controller) {
 			}
 
 			if (getButton(controller, padbinds.switchRevert)) {
-				dev->controlData[3] |= 0x01 << 0;
-				dev->controlData[18] = 0xff;
+				dev->controlData[3] |= 0x01 << 3;
+				dev->controlData[17] = 0xff;
 				dev->controlData[3] |= 0x01 << 1;
 				dev->controlData[19] = 0xff;
+				dev->controlData[3] |= 0x01 << 2;
+				dev->controlData[16] = 0xff;
+				dev->controlData[3] |= 0x01 << 0;
+				dev->controlData[18] = 0xff;
 			}
 		}
 
@@ -400,10 +404,14 @@ void pollKeyboard(device *dev) {
 			dev->controlData[19] = 0xff;
 		}
 		if (keyboardState[keybinds.switchRevert]) {
-			dev->controlData[3] |= 0x01 << 0;
-			dev->controlData[18] = 0xff;
+			dev->controlData[3] |= 0x01 << 3;
+			dev->controlData[17] = 0xff;
 			dev->controlData[3] |= 0x01 << 1;
 			dev->controlData[19] = 0xff;
+			dev->controlData[3] |= 0x01 << 2;
+			dev->controlData[16] = 0xff;
+			dev->controlData[3] |= 0x01 << 0;
+			dev->controlData[18] = 0xff;
 		}
 	}
 		
