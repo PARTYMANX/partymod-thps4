@@ -271,8 +271,6 @@ LRESULT CALLBACK pgui_wndproc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam
 	return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
-#pragma comment( lib, "comctl32.lib" )
-
 pgui_control *pgui_window_create(int width, int height, char *title) {	// TODO: window styling
 	pgui_control *result = malloc(sizeof(pgui_control));
 	result->type = PGUI_CONTROL_TYPE_WINDOW;
@@ -605,18 +603,6 @@ LRESULT pgui_textbox_wndproc(pgui_control *control, HWND hwnd, UINT uMsg, WPARAM
 					}
 				}
 				if (controlCode == EN_KILLFOCUS) {
-					/*
-					char entryBuffer[16];
-					Edit_GetText(settingsPage.customResolutionXBox, entryBuffer, 16);
-					settings.resX = atoi(entryBuffer);
-
-					if (settings.resX < 320) {
-						settings.resX = 320;
-					}
-
-					itoa(settings.resX, entryBuffer, 10);
-					Edit_SetText(settingsPage.customResolutionXBox, entryBuffer);
-					*/
 					if (control->textbox.on_focus_lost) {
 						control->textbox.on_focus_lost(control, control->textbox.on_focus_lost_data);
 					}
@@ -865,11 +851,11 @@ void initResolutionList() {
 	displayModeStringList[0] = "Default Desktop Resolution";
 
 	for (i = 0; i < numDisplayModes; i++) {
-		printf("OUTPUT DISPLAY MODE %d: %d x %d\n", i, displayModeList[i].width, displayModeList[i].height);
+		//printf("OUTPUT DISPLAY MODE %d: %d x %d\n", i, displayModeList[i].width, displayModeList[i].height);
 		char resolutionString[64];
 		sprintf(resolutionString, "%dx%d", displayModeList[i].width, displayModeList[i].height);
 
-		displayModeStringList[i + 1] = malloc(strlen(resolutionString));
+		displayModeStringList[i + 1] = calloc(strlen(resolutionString) + 1, 1);
 		strcpy(displayModeStringList[i + 1], resolutionString);
 	}
 }
@@ -1805,7 +1791,8 @@ void build_general_page(pgui_control *parent) {
 
 	// miscellaneous options
 	general_page.ps2_controls = pgui_checkbox_create(8, 16, 128, 24, "Use PS2 Controls", misc_groupbox);
-	general_page.dropdown_pc = pgui_checkbox_create(8, 16 + 24, 128, 24, "Enable PC Dropdown", misc_groupbox);
+	general_page.dropdown_pc = pgui_checkbox_create(8, 16 + 24, 128, 24, "Enable PC Dropdown*", misc_groupbox);
+	pgui_label_create(8, misc_groupbox->h - 8 - 32, 160, 32, "*Dropdown always enabled with PS2 controls", PGUI_LABEL_JUSTIFY_LEFT, misc_groupbox);
 
 	pgui_checkbox_set_on_toggle(general_page.windowed, do_setting_checkbox, &(settings.windowed));
 	pgui_checkbox_set_on_toggle(general_page.borderless, do_setting_checkbox, &(settings.borderless));
