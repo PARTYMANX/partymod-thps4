@@ -12,8 +12,8 @@
 #include <config.h>
 #include <script.h>
 
-#define VERSION_NUMBER_MAJOR 0
-#define VERSION_NUMBER_MINOR 1
+#define VERSION_NUMBER_MAJOR 1
+#define VERSION_NUMBER_MINOR 0
 
 // FIXME: still broken, not sure why
 double ledgeWarpFix(double n) {

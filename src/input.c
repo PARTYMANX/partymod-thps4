@@ -263,25 +263,49 @@ void pollController(device *dev, SDL_GameController *controller) {
 		}
 
 		// shoulders
-		if (getButton(controller, padbinds.leftSpin)) {
-			dev->controlData[3] |= 0x01 << 2;
-			dev->controlData[16] = 0xff;
+		if (inputsettings.isPs2Controls) {
+			if (getButton(controller, padbinds.leftSpin)) {
+				dev->controlData[3] |= 0x01 << 2;
+				dev->controlData[16] = 0xff;
+			}
+
+			if (getButton(controller, padbinds.rightSpin)) {
+				dev->controlData[3] |= 0x01 << 3;
+				dev->controlData[17] = 0xff;
+			}
+
+			if (getButton(controller, padbinds.nollie)) {
+				dev->controlData[3] |= 0x01 << 0;
+				dev->controlData[18] = 0xff;
+			}
+
+			if (getButton(controller, padbinds.switchRevert)) {
+				dev->controlData[3] |= 0x01 << 1;
+				dev->controlData[19] = 0xff;
+			}
+		} else {
+			if (getButton(controller, padbinds.leftSpin)) {
+				dev->controlData[3] |= 0x01 << 2;
+				dev->controlData[16] = 0xff;
+				dev->controlData[3] |= 0x01 << 0;
+				dev->controlData[18] = 0xff;
+			}
+
+			if (getButton(controller, padbinds.rightSpin)) {
+				dev->controlData[3] |= 0x01 << 3;
+				dev->controlData[17] = 0xff;
+				dev->controlData[3] |= 0x01 << 1;
+				dev->controlData[19] = 0xff;
+			}
+
+			if (getButton(controller, padbinds.switchRevert)) {
+				dev->controlData[3] |= 0x01 << 0;
+				dev->controlData[18] = 0xff;
+				dev->controlData[3] |= 0x01 << 1;
+				dev->controlData[19] = 0xff;
+			}
 		}
 
-		if (getButton(controller, padbinds.rightSpin)) {
-			dev->controlData[3] |= 0x01 << 3;
-			dev->controlData[17] = 0xff;
-		}
-
-		if (getButton(controller, padbinds.nollie)) {
-			dev->controlData[3] |= 0x01 << 0;
-			dev->controlData[18] = 0xff;
-		}
-
-		if (getButton(controller, padbinds.switchRevert)) {
-			dev->controlData[3] |= 0x01 << 1;
-			dev->controlData[19] = 0xff;
-		}
 		
 		// d-pad
 		if (SDL_GameControllerGetButton(controller, padbinds.up)) {
@@ -300,22 +324,6 @@ void pollController(device *dev, SDL_GameController *controller) {
 			dev->controlData[2] |= 0x01 << 7;
 			dev->controlData[9] = 0xFF;
 		}
-
-		/*if (inputsettings.isPs2Controls) {
-			// big hack: bike backwards revert looks for white button specifically, so just bind that to the revert button when in ps2 mode as there are no side effects
-			if (getButton(controller, padbinds.switchRevert)) {
-				dev->controlData[20] |= 0x01 << 1;
-			} 
-		} else {
-			if (getButton(controller, padbinds.nollie)) {
-				dev->controlData[20] |= 0x01 << 1;
-			}
-
-			// caveman
-			if (getButton(controller, padbinds.switchRevert)) {
-				dev->controlData[20] |= 0x01 << 0;
-			}
-		}*/
 		
 		// sticks
 		getStick(controller, padbinds.camera, &(dev->controlData[4]), &(dev->controlData[5]));
@@ -360,38 +368,43 @@ void pollKeyboard(device *dev) {
 		dev->controlData[15] = 0xff;
 	}
 
-	/*if (inputsettings.isPs2Controls) {
-		// big hack: bike backwards revert looks for white button specifically, so just bind that to the revert button when in ps2 mode as there are no side effects
-		if (keyboardState[keybinds.switchRevert]) {
-			dev->controlData[20] |= 0x01 << 1;
-		} 
-	} else {
-		if (keyboardState[keybinds.nollie]) {
-			dev->controlData[20] |= 0x01 << 1;
-		}
-
-		// caveman
-		if (keyboardState[keybinds.switchRevert]) {
-			dev->controlData[20] |= 0x01 << 0;
-		}
-	}*/
-
 	// shoulders
-	if (keyboardState[keybinds.leftSpin]) {
-		dev->controlData[3] |= 0x01 << 2;
-		dev->controlData[16] = 0xff;
-	}
-	if (keyboardState[keybinds.rightSpin]) {
-		dev->controlData[3] |= 0x01 << 3;
-		dev->controlData[17] = 0xff;
-	}
-	if (keyboardState[keybinds.nollie]) {
-		dev->controlData[3] |= 0x01 << 0;
-		dev->controlData[18] = 0xff;
-	}
-	if (keyboardState[keybinds.switchRevert]) {
-		dev->controlData[3] |= 0x01 << 1;
-		dev->controlData[19] = 0xff;
+	if (inputsettings.isPs2Controls) {
+		if (keyboardState[keybinds.leftSpin]) {
+			dev->controlData[3] |= 0x01 << 2;
+			dev->controlData[16] = 0xff;
+		}
+		if (keyboardState[keybinds.rightSpin]) {
+			dev->controlData[3] |= 0x01 << 3;
+			dev->controlData[17] = 0xff;
+		}
+		if (keyboardState[keybinds.nollie]) {
+			dev->controlData[3] |= 0x01 << 0;
+			dev->controlData[18] = 0xff;
+		}
+		if (keyboardState[keybinds.switchRevert]) {
+			dev->controlData[3] |= 0x01 << 1;
+			dev->controlData[19] = 0xff;
+		}
+	} else {
+		if (keyboardState[keybinds.leftSpin]) {
+			dev->controlData[3] |= 0x01 << 2;
+			dev->controlData[16] = 0xff;
+			dev->controlData[3] |= 0x01 << 0;
+			dev->controlData[18] = 0xff;
+		}
+		if (keyboardState[keybinds.rightSpin]) {
+			dev->controlData[3] |= 0x01 << 3;
+			dev->controlData[17] = 0xff;
+			dev->controlData[3] |= 0x01 << 1;
+			dev->controlData[19] = 0xff;
+		}
+		if (keyboardState[keybinds.switchRevert]) {
+			dev->controlData[3] |= 0x01 << 0;
+			dev->controlData[18] = 0xff;
+			dev->controlData[3] |= 0x01 << 1;
+			dev->controlData[19] = 0xff;
+		}
 	}
 		
 	// d-pad

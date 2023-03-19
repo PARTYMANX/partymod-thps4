@@ -122,9 +122,6 @@ void createSDLWindow() {
 	}
 
 	// patch resolution setting
-	//patchDWord(0x0043f089 + 4, resX);
-	//patchDWord(0x0043f0d5 + 2, resX);
-	//patchDWord(0x0043f082 + 1, resY);
 
 	patchNop(0x0043f0f0, 15);
 	patchNop(0x0043f136, 8);
