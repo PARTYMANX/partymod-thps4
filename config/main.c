@@ -885,6 +885,11 @@ struct keybinds {
 	SDL_Scancode switchRevert;
 	SDL_Scancode pause;
 
+	SDL_Scancode item_up;
+	SDL_Scancode item_down;
+	SDL_Scancode item_left;
+	SDL_Scancode item_right;
+
 	SDL_Scancode forward;
 	SDL_Scancode backward;
 	SDL_Scancode left;
@@ -1037,6 +1042,11 @@ void defaultSettings() {
 	keybinds.switchRevert = SDL_SCANCODE_KP_9;
 	keybinds.pause = SDL_SCANCODE_ESCAPE;
 
+	keybinds.item_up = SDL_SCANCODE_HOME;
+	keybinds.item_down = SDL_SCANCODE_END;
+	keybinds.item_left = SDL_SCANCODE_DELETE;
+	keybinds.item_right = SDL_SCANCODE_PAGEDOWN;
+
 	keybinds.forward = SDL_SCANCODE_W;
 	keybinds.backward = SDL_SCANCODE_S;
 	keybinds.left = SDL_SCANCODE_A;
@@ -1115,6 +1125,11 @@ void loadSettings() {
 	keybinds.switchRevert = GetPrivateProfileInt("Keybinds", "Switch", SDL_SCANCODE_KP_9, configFile);
 	keybinds.pause = GetPrivateProfileInt("Keybinds", "Pause", 0, configFile);
 
+	keybinds.item_up = GetPrivateProfileInt("Keybinds", "ItemUp", SDL_SCANCODE_HOME, configFile);
+	keybinds.item_down = GetPrivateProfileInt("Keybinds", "ItemDown", SDL_SCANCODE_END, configFile);
+	keybinds.item_left = GetPrivateProfileInt("Keybinds", "ItemLeft", SDL_SCANCODE_DELETE, configFile);
+	keybinds.item_right = GetPrivateProfileInt("Keybinds", "ItemRight", SDL_SCANCODE_PAGEDOWN, configFile);
+
 	keybinds.forward = GetPrivateProfileInt("Keybinds", "Forward", SDL_SCANCODE_W, configFile);
 	keybinds.backward = GetPrivateProfileInt("Keybinds", "Backward", SDL_SCANCODE_S, configFile);
 	keybinds.left = GetPrivateProfileInt("Keybinds", "Left", SDL_SCANCODE_A, configFile);
@@ -1182,6 +1197,11 @@ void saveSettings() {
 	writeIniInt("Keybinds", "Switch", keybinds.switchRevert, configFile);
 	writeIniInt("Keybinds", "Pause", keybinds.pause, configFile);
 
+	writeIniInt("Keybinds", "ItemUp", keybinds.item_up, configFile);
+	writeIniInt("Keybinds", "ItemDown", keybinds.item_down, configFile);
+	writeIniInt("Keybinds", "ItemLeft", keybinds.item_left, configFile);
+	writeIniInt("Keybinds", "ItemRight", keybinds.item_right, configFile);
+
 	writeIniInt("Keybinds", "Forward", keybinds.forward, configFile);
 	writeIniInt("Keybinds", "Backward", keybinds.backward, configFile);
 	writeIniInt("Keybinds", "Left", keybinds.left, configFile);
@@ -1241,7 +1261,17 @@ void setBindText(pgui_control *control, SDL_Scancode key) {
 	}
 }
 
+int doing_keybind = 0;
+
 void doKeyBind(char *name, SDL_Scancode *target, pgui_control *control) {
+	if (doing_keybind) {
+		// trying to do keybind while we're already trying to process one hangs the program, so let's put this off until later
+		// NOTE: this causes a mildly annoying bug where selecting another control to bind fails
+		return;
+	}
+
+	doing_keybind = 1;
+
 	pgui_textbox_set_text(control, "Press key...");
 
 	SDL_Init(SDL_INIT_EVENTS);
@@ -1250,11 +1280,13 @@ void doKeyBind(char *name, SDL_Scancode *target, pgui_control *control) {
 	sprintf(namebuf, "Press Key To Bind To %s", name);
 
 	RECT windowRect;
-	/*if (!GetWindowRect(control->, &windowRect)) {
+
+	if (!GetWindowRect(control->hwnd, &windowRect)) {
 		printf("Failed to get window rect!!\n");
 		return;
-	}*/
+	}
 
+	// create 1x1 window in top left where it's least likely to be noticed
 	SDL_Window *inputWindow = SDL_CreateWindow(namebuf, 0, 0, 1, 1, SDL_WINDOW_INPUT_FOCUS | SDL_WINDOW_BORDERLESS);
 
 	if (!inputWindow) {
@@ -1266,7 +1298,8 @@ void doKeyBind(char *name, SDL_Scancode *target, pgui_control *control) {
 	int doneInput = 0;
 	SDL_Event e;
 	while (!doneInput) {
-		while(SDL_PollEvent(&e) && !doneInput) {
+		//printf("still running event loop\n");
+		while(SDL_PollEvent(&e)) {
 			if (e.type == SDL_KEYDOWN) {
 				SDL_KeyCode keyCode = SDL_GetKeyFromScancode(e.key.keysym.scancode);
 				printf("Pressed key %s\n", SDL_GetKeyName(keyCode));
@@ -1287,6 +1320,8 @@ void doKeyBind(char *name, SDL_Scancode *target, pgui_control *control) {
 	setBindText(control, *target);
 
 	SDL_Quit();
+
+	doing_keybind = 0;
 }
 
 char *gamepad_bind_values[22] = {
@@ -1560,6 +1595,11 @@ struct keyboard_page {
 	pgui_control *switch_revert;
 	pgui_control *pause;
 
+	pgui_control *item_up;
+	pgui_control *item_down;
+	pgui_control *item_left;
+	pgui_control *item_right;
+
 	pgui_control *forward;
 	pgui_control *backward;
 	pgui_control *left;
@@ -1597,12 +1637,14 @@ pgui_control *build_keybind_textbox(int x, int y, int w, int h, pgui_control *pa
 }
 
 void build_keyboard_page(pgui_control *parent) {
-	pgui_control *actions_groupbox = pgui_groupbox_create(8, 8, (parent->w / 2) - 8 - 4, parent->h - 8 - 8, "Actions", parent);
+	pgui_control *actions_groupbox = pgui_groupbox_create(8, 8, (parent->w / 2) - 8 - 4, (parent->h / 2) - 8 - 4 + 56, "Actions", parent);
+	pgui_control *park_editor_groupbox = pgui_groupbox_create (8, (parent->h / 2) + 4 + 56, (parent->w / 2) - 8 - 4, (parent->h / 2) - 8 - 4 - 56, "Park Editor Specific Controls", parent);
 	pgui_control *skater_groupbox = pgui_groupbox_create((parent->w / 2) + 4, 8, (parent->w / 2) - 8 - 4, (parent->h / 2) - 8 - 4 - 32, "Skater Controls", parent);
 	pgui_control *camera_groupbox = pgui_groupbox_create((parent->w / 2) + 4, (parent->h / 2) + 4 - 32, (parent->w / 2) - 8 - 4, (parent->h / 2) - 8 - 4 + 32, "Camera Controls", parent);
 
 	int label_offset = 4;
-	int graphics_v_spacing = 39;
+	int graphics_v_spacing = 23;
+	int park_editor_v_spacing = 24;
 	int skater_v_spacing = 32;
 	int camera_v_spacing = 32;
 
@@ -1634,6 +1676,19 @@ void build_keyboard_page(pgui_control *parent) {
 
 	pgui_label_create(8, 16 + label_offset + (graphics_v_spacing * 8), 96, 16, "Pause:", PGUI_LABEL_JUSTIFY_LEFT, actions_groupbox);
 	keyboard_page.pause = build_keybind_textbox(actions_groupbox->w - 8 - 64, 16 + (graphics_v_spacing * 8), 64, 20, actions_groupbox, "Pause", &(keybinds.pause));
+
+	// park editor (d-pad)
+	pgui_label_create(8, 16 + label_offset, 96, 16, "Spin Right:", PGUI_LABEL_JUSTIFY_LEFT, park_editor_groupbox);
+	keyboard_page.item_up = build_keybind_textbox(park_editor_groupbox->w - 8 - 64, 16, 64, 20, park_editor_groupbox, "Spin Right", &(keybinds.item_up));
+
+	pgui_label_create(8, 16 + label_offset + (park_editor_v_spacing), 96, 16, "Nollie:", PGUI_LABEL_JUSTIFY_LEFT, park_editor_groupbox);
+	keyboard_page.item_down = build_keybind_textbox(park_editor_groupbox->w - 8 - 64, 16 + (park_editor_v_spacing), 64, 20, park_editor_groupbox, "Nollie", &(keybinds.item_down));
+
+	pgui_label_create(8, 16 + label_offset + (park_editor_v_spacing * 2), 96, 16, "Switch:", PGUI_LABEL_JUSTIFY_LEFT, park_editor_groupbox);
+	keyboard_page.item_left = build_keybind_textbox(park_editor_groupbox->w - 8 - 64, 16 + (park_editor_v_spacing * 2), 64, 20, park_editor_groupbox, "Switch", &(keybinds.item_left));
+
+	pgui_label_create(8, 16 + label_offset + (park_editor_v_spacing * 3), 96, 16, "Pause:", PGUI_LABEL_JUSTIFY_LEFT, park_editor_groupbox);
+	keyboard_page.item_right = build_keybind_textbox(park_editor_groupbox->w - 8 - 64, 16 + (park_editor_v_spacing * 3), 64, 20, park_editor_groupbox, "Pause", &(keybinds.item_right));
 
 	// skater controls
 	pgui_label_create(8, 16 + label_offset, 96, 16, "Forward:", PGUI_LABEL_JUSTIFY_LEFT, skater_groupbox);
@@ -1678,6 +1733,11 @@ void setAllBindText() {
 	setBindText(keyboard_page.nollie, keybinds.nollie);
 	setBindText(keyboard_page.switch_revert, keybinds.switchRevert);
 	setBindText(keyboard_page.pause, keybinds.pause);
+
+	setBindText(keyboard_page.item_up, keybinds.item_up);
+	setBindText(keyboard_page.item_down, keybinds.item_down);
+	setBindText(keyboard_page.item_left, keybinds.item_left);
+	setBindText(keyboard_page.item_right, keybinds.item_right);
 
 	setBindText(keyboard_page.forward, keybinds.forward);
 	setBindText(keyboard_page.backward, keybinds.backward);

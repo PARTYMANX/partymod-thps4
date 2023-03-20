@@ -20,6 +20,11 @@ struct keybinds {
 	SDL_Scancode nollie;
 	SDL_Scancode switchRevert;
 
+	SDL_Scancode item_up;
+	SDL_Scancode item_down;
+	SDL_Scancode item_left;
+	SDL_Scancode item_right;
+
 	SDL_Scancode right;
 	SDL_Scancode left;
 	SDL_Scancode up;

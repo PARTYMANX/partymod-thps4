@@ -416,19 +416,19 @@ void pollKeyboard(device *dev) {
 	}
 		
 	// d-pad
-	if (keyboardState[keybinds.up]) {
+	if (keyboardState[keybinds.item_up]) {
 		dev->controlData[2] |= 0x01 << 4;
 		dev->controlData[10] = 0xFF;
 	}
-	if (keyboardState[keybinds.right]) {
+	if (keyboardState[keybinds.item_right]) {
 		dev->controlData[2] |= 0x01 << 5;
 		dev->controlData[8] = 0xFF;
 	}
-	if (keyboardState[keybinds.down]) {
+	if (keyboardState[keybinds.item_down]) {
 		dev->controlData[2] |= 0x01 << 6;
 		dev->controlData[11] = 0xFF;
 	}
-	if (keyboardState[keybinds.left]) {
+	if (keyboardState[keybinds.item_left]) {
 		dev->controlData[2] |= 0x01 << 7;
 		dev->controlData[9] = 0xFF;
 	}
