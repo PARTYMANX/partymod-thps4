@@ -738,7 +738,7 @@ void __cdecl processController(device *dev) {
 	dev->vibrationData_max[0] = 255;
 	dev->vibrationData_max[1] = 255;
 	dev->state = 2;
-	dev->actuatorsDisabled = 0;
+	//dev->actuatorsDisabled = 0;
 
 	SDL_Event e;
 	while(SDL_PollEvent(&e)) {
