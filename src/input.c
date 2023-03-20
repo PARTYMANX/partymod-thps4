@@ -471,7 +471,7 @@ void pollKeyboard(device *dev) {
 
 // returns 1 if a text entry prompt is on-screen so that keybinds don't interfere with text entry confirmation/cancellation
 uint8_t isKeyboardTyping() {
-	uint8_t *keyboard_on_screen = 0x00ab5bac;
+	uint8_t *keyboard_on_screen = 0x00ab5bae;
 
 	return *keyboard_on_screen;
 }
@@ -815,15 +815,6 @@ void __cdecl processController(device *dev) {
 	} else {
 		dev->start_or_a_pressed = 0;
 	}
-
-	// keyboard text entry doesn't work unless these values are set correctly
-	/*uint8_t *unk2 = 0x00751dc0;
-	uint8_t *unk3 = 0x0074fb43;
-
-	*unk2 = 1;
-	*unk3 = 0;*/
-
-	//printf("UNKNOWN VALUES: 0x0074fb42: %d, 0x00751dc0: %d, 0x0074fb43: %d\n", *unk1, *unk2, *unk3);
 }
 
 void __cdecl set_actuators(device *dev, uint16_t left, uint16_t right) {
