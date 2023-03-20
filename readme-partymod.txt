@@ -9,12 +9,14 @@ Features and Fixes:
 - Controller vibration now more consistently works with controllers
 - Improved window handling allowing for custom resolutions and configurable windowing
 - Fixed aspect ratio to be based on window dimensions
+- Added option to disable gamma correction in fullscreen mode to prevent the game from looking unexpectedly dark
 - Replaced configuration files with new INI-based system (see partymod.ini)
 - Custom configurator program to handle new configuration files
 - Fixed ledge warp bugs where the skater is teleported down farther than intended
 - Fixed visually incorrect screen flash (I.E. when running into a lion on Zoo)
 - Fixed broken skater friction when autokick was enabled
 - Added a framerate cap to fix logic depending on a framerate of 60hz (long trick point accrual, special meter depreciation, goal logic like SF Manual Rollercoaster)
+- fixes music randomization (introduces entropy *only* for music randomization and consumes the same number of random values to be safe)
 
 INSTALLATION:
 1. Make sure THPS4 (English) is installed, remove the widescreen mod if it is installed (delete dinput8.dll)

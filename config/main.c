@@ -869,6 +869,7 @@ struct settings {
 	int hq_shadows;
 	int antialiasing;
 	int distance_fog;
+	int disable_gamma;
 
 	int ps2_controls;
 	int dropdown_pc;
@@ -1028,6 +1029,7 @@ void defaultSettings() {
 	settings.hq_shadows = 1;
 	settings.antialiasing = 0;
 	settings.distance_fog = 0;
+	settings.disable_gamma = 1;
 	
 	settings.ps2_controls = 1;
 	settings.dropdown_pc = 1;
@@ -1111,6 +1113,7 @@ void loadSettings() {
 	settings.hq_shadows = getIniBool("Graphics", "HQShadows", 1, configFile);
 	settings.antialiasing = getIniBool("Graphics", "AntiAliasing", 0, configFile);
 	settings.distance_fog = getIniBool("Graphics", "DistanceFog", 0, configFile);
+	settings.disable_gamma = getIniBool("Graphics", "DisableFullscreenGamma", 1, configFile);
 
 	settings.ps2_controls = getIniBool("Miscellaneous", "UsePS2Controls", 1, configFile);
 	settings.dropdown_pc = getIniBool("Miscellaneous", "EnablePCDropdown", 1, configFile);
@@ -1183,6 +1186,7 @@ void saveSettings() {
 	writeIniBool("Graphics", "HQShadows", settings.hq_shadows, configFile);
 	writeIniBool("Graphics", "AntiAliasing", settings.antialiasing, configFile);
 	writeIniBool("Graphics", "DistanceFog", settings.distance_fog, configFile);
+	writeIniBool("Graphics", "DisableFullscreenGamma", settings.disable_gamma, configFile);
 
 	writeIniBool("Miscellaneous", "UsePS2Controls", settings.ps2_controls, configFile);
 	writeIniBool("Miscellaneous", "EnablePCDropdown", settings.dropdown_pc, configFile);
@@ -1766,6 +1770,7 @@ struct general_page {
 	pgui_control *antialiasing;
 	pgui_control *hq_shadows;
 	pgui_control *distance_fog;
+	pgui_control *disable_gamma;
 
 	pgui_control *ps2_controls;
 	pgui_control *dropdown_pc;
@@ -1848,6 +1853,7 @@ void build_general_page(pgui_control *parent) {
 	general_page.antialiasing = pgui_checkbox_create(8, 16, 128, 24, "Anti-Aliasing", graphics_groupbox);
 	general_page.hq_shadows = pgui_checkbox_create(8, 16 + 24, 128, 24, "High Quality Shadows", graphics_groupbox);
 	general_page.distance_fog = pgui_checkbox_create(8, 16 + (24 * 2), 128, 24, "Distance Fog", graphics_groupbox);
+	general_page.disable_gamma = pgui_checkbox_create(8, 16 + (24 * 3), 160, 24, "Disable Gamma In Fullscreen", graphics_groupbox);
 
 	// miscellaneous options
 	general_page.ps2_controls = pgui_checkbox_create(8, 16, 128, 24, "Use PS2 Controls", misc_groupbox);
@@ -1860,6 +1866,7 @@ void build_general_page(pgui_control *parent) {
 	pgui_checkbox_set_on_toggle(general_page.antialiasing, do_setting_checkbox, &(settings.antialiasing));
 	pgui_checkbox_set_on_toggle(general_page.hq_shadows, do_setting_checkbox, &(settings.hq_shadows));
 	pgui_checkbox_set_on_toggle(general_page.distance_fog, do_setting_checkbox, &(settings.distance_fog));
+	pgui_checkbox_set_on_toggle(general_page.disable_gamma, do_setting_checkbox, &(settings.disable_gamma));
 
 	pgui_checkbox_set_on_toggle(general_page.ps2_controls, do_setting_checkbox, &(settings.ps2_controls));
 	pgui_checkbox_set_on_toggle(general_page.dropdown_pc, do_setting_checkbox, &(settings.dropdown_pc));
@@ -1923,6 +1930,7 @@ void update_general_page() {
 	pgui_checkbox_set_checked(general_page.antialiasing, settings.antialiasing);
 	pgui_checkbox_set_checked(general_page.hq_shadows, settings.hq_shadows);
 	pgui_checkbox_set_checked(general_page.distance_fog, settings.distance_fog);
+	pgui_checkbox_set_checked(general_page.disable_gamma, settings.disable_gamma);
 
 	pgui_checkbox_set_checked(general_page.ps2_controls, settings.ps2_controls);
 	pgui_checkbox_set_checked(general_page.dropdown_pc, settings.dropdown_pc);

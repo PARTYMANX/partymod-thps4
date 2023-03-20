@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <time.h>
 
 #include <SDL2/SDL.h>
 
@@ -244,6 +245,8 @@ void patchFriction() {
 
 void patchDisableGamma();
 
+uint32_t rng_seed = 0;
+
 void initPatch() {
 	GetModuleFileName(NULL, &executableDirectory, filePathBufLen);
 
@@ -284,6 +287,10 @@ void initPatch() {
 	if (disableGamma) {
 		patchDisableGamma();
 	}
+
+	// get some source of entropy for the music randomizer
+	rng_seed = time(NULL) & 0xffffffff;
+	srand(rng_seed);
 
 	printf("Patch Initialized\n");
 }
@@ -434,6 +441,20 @@ void patchRenderer() {
 	patchNop(0x0043bb15, 55);
 }
 
+void our_random(int out_of) {
+	// first, call the original random so that we consume a value.  
+	// juuust in case someone wants actual 100% identical behavior between partymod and the original game
+	void (__cdecl *their_random)(int) = (void *)0x00402c40;
+
+	their_random(out_of);
+
+	return rand() % out_of;
+}
+
+void patchRandomMusic() {
+	patchCall(0x0042cb74, our_random);
+}
+
 __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpReserved) {
 	// Perform actions based on the reason for calling.
 	switch(fdwReason) { 
@@ -452,6 +473,7 @@ __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, L
 			patchScriptHook();
 			//patchIsPs2();
 			patchScreenFlash();
+			patchRandomMusic();
 
 			//patchRenderer();
 			
