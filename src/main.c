@@ -244,6 +244,7 @@ void patchFriction() {
 }
 
 void patchDisableGamma();
+void patchFrameCap();
 
 uint32_t rng_seed = 0;
 
@@ -286,6 +287,17 @@ void initPatch() {
 	int disableGamma = getIniBool("Graphics", "DisableFullscreenGamma", 1, configFile);
 	if (disableGamma) {
 		patchDisableGamma();
+	}
+
+	int disablePhysicsFixes = getIniBool("Miscellaneous", "DisablePhysicsFixes", 0, configFile);
+	if (!disablePhysicsFixes) {
+		patchLedgeWarp();
+		patchFriction();
+	}
+
+	int disableFramerateCap = getIniBool("Miscellaneous", "DisableFramerateCap", 0, configFile);
+	if (!disableFramerateCap) {
+		patchFrameCap();
 	}
 
 	// get some source of entropy for the music randomizer
@@ -464,14 +476,9 @@ __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, L
 
 			// install patches
 			patchWindow();
-			patchLedgeWarp();
-			patchFriction();
-			patchFrameCap();
 			patchInput();
 			patchCall((void *)(0x005319ab), &(initPatch));
-			//patchLoadConfig();
 			patchScriptHook();
-			//patchIsPs2();
 			patchScreenFlash();
 			patchRandomMusic();
 
