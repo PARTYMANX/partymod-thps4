@@ -15,6 +15,7 @@
 
 #define VERSION_NUMBER_MAJOR 1
 #define VERSION_NUMBER_MINOR 0
+#define VERSION_NUMBER_FIX 1
 
 // FIXME: still broken, not sure why
 double ledgeWarpFix(double n) {
@@ -270,7 +271,7 @@ void initPatch() {
 		freopen_s(&fDummy, "CONOUT$", "w", stderr);
 		freopen_s(&fDummy, "CONOUT$", "w", stdout);
 	}
-	printf("PARTYMOD for THPS4 %d.%d\n", VERSION_NUMBER_MAJOR, VERSION_NUMBER_MINOR);
+	printf("PARTYMOD for THPS4 %d.%d.%d\n", VERSION_NUMBER_MAJOR, VERSION_NUMBER_MINOR, VERSION_NUMBER_FIX);
 
 	printf("DIRECTORY: %s\n", executableDirectory);
 

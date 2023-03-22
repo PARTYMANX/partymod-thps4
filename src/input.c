@@ -910,7 +910,7 @@ __asm success:	\
 #define not_spine_buttons_asm(SUCCESS, FAIL) spine_buttons_asm(FAIL, SUCCESS)
 
 void __stdcall ground_gone(void *comp) {
-	not_spine_buttons_asm(0x004bc011, 0x004bc00a);
+	not_spine_buttons_asm(0x004bc00a, 0x004bc011);
 }
 
 void __stdcall maybe_break_vert_1(void *comp) {
