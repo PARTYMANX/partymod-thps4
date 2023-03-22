@@ -335,6 +335,21 @@ void pollController(device *dev, SDL_GameController *controller) {
 	}
 }
 
+uint8_t getKey(SDL_Scancode key) {
+	uint8_t *menu_on_screen = 0x00ab5bac;
+
+	uint8_t *keyboardState = SDL_GetKeyboardState(NULL);
+
+	if (menu_on_screen) {
+		// if a menu is on screen, ignore menu binds
+		if (key == SDL_SCANCODE_RETURN || key == SDL_SCANCODE_ESCAPE || key == SDL_SCANCODE_UP || key == SDL_SCANCODE_DOWN || key == SDL_SCANCODE_LEFT || key == SDL_SCANCODE_RIGHT) {
+			return 0;
+		}
+	}
+
+	return keyboardState[key];
+}
+
 void pollKeyboard(device *dev) {
 	dev->isValid = 1;
 	dev->isPluggedIn = 1;
@@ -342,68 +357,68 @@ void pollKeyboard(device *dev) {
 	uint8_t *keyboardState = SDL_GetKeyboardState(NULL);
 
 	// buttons
-	if (keyboardState[keybinds.menu]) {
+	if (getKey(keybinds.menu)) {
 		dev->controlData[2] |= 0x01 << 3;
 	}
-	if (keyboardState[keybinds.cameraToggle]) {
+	if (getKey(keybinds.cameraToggle)) {
 		dev->controlData[2] |= 0x01 << 0;
 	}
-	/*if (keyboardState[keybinds.focus]) {	// no control for left stick on keyboard
+	/*if (getKey(keybinds.focus]) {	// no control for left stick on keyboard
 		dev->controlData[2] |= 0x01 << 1;
 	}*/
-	if (keyboardState[keybinds.cameraSwivelLock]) {
+	if (getKey(keybinds.cameraSwivelLock)) {
 		dev->controlData[2] |= 0x01 << 2;
 	}
 
-	if (keyboardState[keybinds.grind]) {
+	if (getKey(keybinds.grind)) {
 		dev->controlData[3] |= 0x01 << 4;
 		dev->controlData[12] = 0xff;
 	}
-	if (keyboardState[keybinds.grab]) {
+	if (getKey(keybinds.grab)) {
 		dev->controlData[3] |= 0x01 << 5;
 		dev->controlData[13] = 0xff;
 	}
-	if (keyboardState[keybinds.ollie]) {
+	if (getKey(keybinds.ollie)) {
 		dev->controlData[3] |= 0x01 << 6;
 		dev->controlData[14] = 0xff;
 	}
-	if (keyboardState[keybinds.kick]) {
+	if (getKey(keybinds.kick)) {
 		dev->controlData[3] |= 0x01 << 7;
 		dev->controlData[15] = 0xff;
 	}
 
 	// shoulders
 	if (inputsettings.isPs2Controls) {
-		if (keyboardState[keybinds.leftSpin]) {
+		if (getKey(keybinds.leftSpin)) {
 			dev->controlData[3] |= 0x01 << 2;
 			dev->controlData[16] = 0xff;
 		}
-		if (keyboardState[keybinds.rightSpin]) {
+		if (getKey(keybinds.rightSpin)) {
 			dev->controlData[3] |= 0x01 << 3;
 			dev->controlData[17] = 0xff;
 		}
-		if (keyboardState[keybinds.nollie]) {
+		if (getKey(keybinds.nollie)) {
 			dev->controlData[3] |= 0x01 << 0;
 			dev->controlData[18] = 0xff;
 		}
-		if (keyboardState[keybinds.switchRevert]) {
+		if (getKey(keybinds.switchRevert)) {
 			dev->controlData[3] |= 0x01 << 1;
 			dev->controlData[19] = 0xff;
 		}
 	} else {
-		if (keyboardState[keybinds.leftSpin]) {
+		if (getKey(keybinds.leftSpin)) {
 			dev->controlData[3] |= 0x01 << 2;
 			dev->controlData[16] = 0xff;
 			dev->controlData[3] |= 0x01 << 0;
 			dev->controlData[18] = 0xff;
 		}
-		if (keyboardState[keybinds.rightSpin]) {
+		if (getKey(keybinds.rightSpin)) {
 			dev->controlData[3] |= 0x01 << 3;
 			dev->controlData[17] = 0xff;
 			dev->controlData[3] |= 0x01 << 1;
 			dev->controlData[19] = 0xff;
 		}
-		if (keyboardState[keybinds.switchRevert]) {
+		if (getKey(keybinds.switchRevert)) {
 			dev->controlData[3] |= 0x01 << 3;
 			dev->controlData[17] = 0xff;
 			dev->controlData[3] |= 0x01 << 1;
@@ -416,19 +431,19 @@ void pollKeyboard(device *dev) {
 	}
 		
 	// d-pad
-	if (keyboardState[keybinds.item_up]) {
+	if (getKey(keybinds.item_up)) {
 		dev->controlData[2] |= 0x01 << 4;
 		dev->controlData[10] = 0xFF;
 	}
-	if (keyboardState[keybinds.item_right]) {
+	if (getKey(keybinds.item_right)) {
 		dev->controlData[2] |= 0x01 << 5;
 		dev->controlData[8] = 0xFF;
 	}
-	if (keyboardState[keybinds.item_down]) {
+	if (getKey(keybinds.item_down)) {
 		dev->controlData[2] |= 0x01 << 6;
 		dev->controlData[11] = 0xFF;
 	}
-	if (keyboardState[keybinds.item_left]) {
+	if (getKey(keybinds.item_left)) {
 		dev->controlData[2] |= 0x01 << 7;
 		dev->controlData[9] = 0xFF;
 	}
@@ -436,35 +451,35 @@ void pollKeyboard(device *dev) {
 	// sticks - NOTE: because these keys are very rarely used/important, SOCD handling is just to cancel
 	// right
 	// x
-	if (keyboardState[keybinds.cameraLeft] && !keyboardState[keybinds.cameraRight]) {
+	if (getKey(keybinds.cameraLeft) && !getKey(keybinds.cameraRight)) {
 		dev->controlData[4] = 0;
 	}
-	if (keyboardState[keybinds.cameraRight] && !keyboardState[keybinds.cameraLeft]) {
+	if (getKey(keybinds.cameraRight) && !getKey(keybinds.cameraLeft)) {
 		dev->controlData[4] = 255;
 	}
 
 	// y
-	if (keyboardState[keybinds.cameraUp] && !keyboardState[keybinds.cameraDown]) {
+	if (getKey(keybinds.cameraUp) && !getKey(keybinds.cameraDown)) {
 		dev->controlData[5] = 0;
 	}
-	if (keyboardState[keybinds.cameraDown] && !keyboardState[keybinds.cameraUp]) {
+	if (getKey(keybinds.cameraDown) && !getKey(keybinds.cameraUp)) {
 		dev->controlData[5] = 255;
 	}
 
 	// left
 	// x
-	if (keyboardState[keybinds.left] && !keyboardState[keybinds.right]) {
+	if (getKey(keybinds.left) && !getKey(keybinds.right)) {
 		dev->controlData[6] = 0;
 	}
-	if (keyboardState[keybinds.right] && !keyboardState[keybinds.left]) {
+	if (getKey(keybinds.right) && !getKey(keybinds.left)) {
 		dev->controlData[6] = 255;
 	}
 
 	// y
-	if (keyboardState[keybinds.up] && !keyboardState[keybinds.down]) {
+	if (getKey(keybinds.up) && !getKey(keybinds.down)) {
 		dev->controlData[7] = 0;
 	}
-	if (keyboardState[keybinds.down] && !keyboardState[keybinds.up]) {
+	if (getKey(keybinds.down) && !getKey(keybinds.up)) {
 		dev->controlData[7] = 255;
 	}
 }
