@@ -1016,4 +1016,5 @@ void patchInput() {
 
 	// handle events while unfocused
 	patchCall(0x0042921f, processEventsUnfocused);
+	patchCall(0x0042a612, processEventsUnfocused);
 }
