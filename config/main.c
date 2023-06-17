@@ -1687,16 +1687,16 @@ void build_keyboard_page(pgui_control *parent) {
 
 	// park editor (d-pad)
 	pgui_label_create(8, 16 + label_offset, 96, 16, "Selection Up:", PGUI_LABEL_JUSTIFY_LEFT, park_editor_groupbox);
-	keyboard_page.item_up = build_keybind_textbox(park_editor_groupbox->w - 8 - 64, 16, 64, 20, park_editor_groupbox, "Spin Right", &(keybinds.item_up));
+	keyboard_page.item_up = build_keybind_textbox(park_editor_groupbox->w - 8 - 64, 16, 64, 20, park_editor_groupbox, "Selection Up", &(keybinds.item_up));
 
 	pgui_label_create(8, 16 + label_offset + (park_editor_v_spacing), 96, 16, "Selection Down:", PGUI_LABEL_JUSTIFY_LEFT, park_editor_groupbox);
-	keyboard_page.item_down = build_keybind_textbox(park_editor_groupbox->w - 8 - 64, 16 + (park_editor_v_spacing), 64, 20, park_editor_groupbox, "Nollie", &(keybinds.item_down));
+	keyboard_page.item_down = build_keybind_textbox(park_editor_groupbox->w - 8 - 64, 16 + (park_editor_v_spacing), 64, 20, park_editor_groupbox, "Selection Down", &(keybinds.item_down));
 
 	pgui_label_create(8, 16 + label_offset + (park_editor_v_spacing * 2), 96, 16, "Selection Left:", PGUI_LABEL_JUSTIFY_LEFT, park_editor_groupbox);
-	keyboard_page.item_left = build_keybind_textbox(park_editor_groupbox->w - 8 - 64, 16 + (park_editor_v_spacing * 2), 64, 20, park_editor_groupbox, "Switch", &(keybinds.item_left));
+	keyboard_page.item_left = build_keybind_textbox(park_editor_groupbox->w - 8 - 64, 16 + (park_editor_v_spacing * 2), 64, 20, park_editor_groupbox, "Selection Left", &(keybinds.item_left));
 
 	pgui_label_create(8, 16 + label_offset + (park_editor_v_spacing * 3), 96, 16, "Selection Right:", PGUI_LABEL_JUSTIFY_LEFT, park_editor_groupbox);
-	keyboard_page.item_right = build_keybind_textbox(park_editor_groupbox->w - 8 - 64, 16 + (park_editor_v_spacing * 3), 64, 20, park_editor_groupbox, "Pause", &(keybinds.item_right));
+	keyboard_page.item_right = build_keybind_textbox(park_editor_groupbox->w - 8 - 64, 16 + (park_editor_v_spacing * 3), 64, 20, park_editor_groupbox, "Selection Right", &(keybinds.item_right));
 
 	// skater controls
 	pgui_label_create(8, 16 + label_offset, 96, 16, "Forward:", PGUI_LABEL_JUSTIFY_LEFT, skater_groupbox);
