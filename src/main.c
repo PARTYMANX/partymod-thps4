@@ -354,14 +354,6 @@ void safeWait(uint64_t endTime) {
 uint64_t nextFrame = 0;
 
 void do_frame_cap() {
-	// hook to insert a frame cap into the game loop
-	void (__cdecl *prerender)() = 0x00446950;
-
-	// do frame cap here
-	// TODO: maybe better solution:
-	// if we're early, wait, set next frame to next 60th
-	// if we're late, don't wait, set next from to next 60th from *now*
-
 	uint64_t timerFreq = SDL_GetPerformanceFrequency();
 	uint64_t frameTarget = timerFreq / 60;
 	//printf("FREQUENCY: %lld, %lld\n", timerFreq, frameTarget);
@@ -372,13 +364,11 @@ void do_frame_cap() {
 		safeWait(nextFrame);
 		nextFrame += frameTarget;
 	}
-
-	// original code
-	prerender();
 }
 
 void patchFrameCap() {
-	patchCall(0x0042940f, do_frame_cap);
+	patchNop(0x004292a0, 58);	// patch out original, too high framerate cap
+	patchCall(0x004292a0, do_frame_cap);
 }
 
 struct flashVertex {

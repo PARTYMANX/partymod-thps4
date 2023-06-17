@@ -214,15 +214,25 @@ uint8_t getButton(SDL_GameController *controller, controllerButton button) {
 }
 
 void getStick(SDL_GameController *controller, controllerStick stick, uint8_t *xOut, uint8_t *yOut) {
+	uint8_t result_x, result_y;
+
 	if (stick == CONTROLLER_STICK_LEFT) {
-		*xOut = (uint8_t)((SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTX) >> 8) + 128);
-		*yOut = (uint8_t)((SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTY) >> 8) + 128);
+		result_x = (uint8_t)((SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTX) >> 8) + 128);
+		result_y = (uint8_t)((SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTY) >> 8) + 128);
 	} else if (stick == CONTROLLER_STICK_RIGHT) {
-		*xOut = (uint8_t)((SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_RIGHTX) >> 8) + 128);
-		*yOut = (uint8_t)((SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_RIGHTY) >> 8) + 128);
+		result_x = (uint8_t)((SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_RIGHTX) >> 8) + 128);
+		result_y = (uint8_t)((SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_RIGHTY) >> 8) + 128);
 	} else {
-		*xOut = 0x80;
-		*yOut = 0x80;
+		result_x = 0x80;
+		result_y = 0x80;
+	}
+
+	if (axisAbs(result_x) > axisAbs(*xOut)) {
+		*xOut = result_x;
+	}
+
+	if (axisAbs(result_y) > axisAbs(*yOut)) {
+		*yOut = result_y;
 	}
 }
 
@@ -718,13 +728,13 @@ void processEvent(SDL_Event *e) {
 			setUsingKeyboard(0);
 			return;
 		case SDL_WINDOWEVENT:
-			if (e->window.type == SDL_WINDOWEVENT_FOCUS_LOST) {
-				int *unkFocus = (int *)0x00aab48e;	// i think this is related to video crashes when display is lost
-				*unkFocus = 1;
-
+			if (e->window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
 				int *isFocused = (int *)0x005a027c;
 				*isFocused = 0;
-			} else if (e->window.type == SDL_WINDOWEVENT_FOCUS_GAINED) {
+			} else if (e->window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
+				int *recreateDevice = (int *)0x00aab48e;
+				*recreateDevice = 1;
+
 				int *isFocused = (int *)0x005a027c;
 				*isFocused = 1;
 			}
@@ -736,6 +746,15 @@ void processEvent(SDL_Event *e) {
 		}
 		default:
 			return;
+	}
+}
+
+void processEventsUnfocused() {
+	// called when window is unfocused so that window events are still processed
+
+	SDL_Event e;
+	while(SDL_PollEvent(&e)) {
+		processEvent(&e);
 	}
 }
 
@@ -836,7 +855,7 @@ void __cdecl set_actuators(device *dev, uint16_t left, uint16_t right) {
 	//printf("SETTING ACTUATORS: %d %d %d\n", dev->port, left, right);
 	for (int i = 0; i < controllerCount; i++) {
 		if (SDL_GameControllerGetAttached(controllerList[i]) && SDL_GameControllerGetPlayerIndex(controllerList[i]) == dev->port) {
-			SDL_JoystickRumble(SDL_GameControllerGetJoystick(controllerList[i]), left, right, 1000);
+			SDL_JoystickRumble(SDL_GameControllerGetJoystick(controllerList[i]), left, right, 0);
 		}
 	}
 }
@@ -994,4 +1013,7 @@ void patchInput() {
 	// TEST AL, AL
 	patchByte(0x0042a573 + 5, 0x84);
 	patchByte(0x0042a573 + 6, 0xc0);
+
+	// handle events while unfocused
+	patchCall(0x0042921f, processEventsUnfocused);
 }
