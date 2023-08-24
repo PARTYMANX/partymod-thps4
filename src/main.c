@@ -15,7 +15,7 @@
 
 #define VERSION_NUMBER_MAJOR 1
 #define VERSION_NUMBER_MINOR 0
-#define VERSION_NUMBER_FIX 2
+#define VERSION_NUMBER_FIX 4
 
 // FIXME: still broken, not sure why
 double ledgeWarpFix(double n) {
@@ -429,19 +429,250 @@ void patchCD() {
 	patchByte(0x00543fd0, 0xe9);
 }
 
+// big, unused patch for rendering stuff, was trying to fix performance but made it worse lol
+
+void *oldresult = NULL;
+
+void *set_blend_mode_wrapper(int mode, int unk) {
+	void *(*set_blend_mode)(int, int) = 0x00440de0;
+	int *old_mode = 0x00a72aa4;
+	int *old_unk = 0x00a72aa8;
+
+	if (*old_mode != mode || *old_unk != unk) {
+		oldresult = set_blend_mode(mode, unk);
+		//printf("RETURNING NEW: 0x%08x\n", oldresult);
+	} else {
+		//printf("RETURNING 0\n");
+		return 0;
+	}
+
+	return oldresult;
+}
+
+void patch_blend_mode() {
+	patchCall(0x0043b95e, set_blend_mode_wrapper);
+	patchCall(0x00441737, set_blend_mode_wrapper);
+	patchCall(0x00442da5, set_blend_mode_wrapper);
+	patchCall(0x0044546a, set_blend_mode_wrapper);
+	patchCall(0x0044aacd, set_blend_mode_wrapper);
+	patchCall(0x0044bd90, set_blend_mode_wrapper);
+}
+
+uint32_t changecounter = 0;
+uint32_t drawcounter = 0;
+
+HRESULT(__fastcall *orig_SetRenderState)(void *, void *, void *, uint32_t, uint32_t) = NULL;
+HRESULT(__fastcall *orig_GetRenderState)(void *, void *, void *, uint32_t, uint32_t *) = NULL;
+HRESULT(__fastcall *orig_SetTextureStageState)(void *, void *, void *, uint32_t, uint32_t, uint32_t) = NULL;
+HRESULT(__fastcall *orig_DrawIndexedPrimitive)(void *, void *, void *, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) = NULL;
+HRESULT(__fastcall *orig_DrawIndexedPrimitiveUP)(void *, void *, void *, uint32_t, uint32_t, uint32_t, void *, uint32_t, void *, uint32_t) = NULL;
+HRESULT(__fastcall *orig_DrawPrimitive)(void *, void *, void *, uint32_t, uint32_t, uint32_t) = NULL;
+HRESULT(__fastcall *orig_DrawPrimitiveUP)(void *, void *, void *, uint32_t, uint32_t, void *, uint32_t) = NULL;
+HRESULT(__fastcall *orig_Present)(void *, void *, void *, void *, void *, void *, void *) = NULL;
+HRESULT(__fastcall *orig_BeginScene)(void *, void *, void *) = NULL;
+HRESULT(__fastcall *orig_SetStreamSource)(void *, void *, void *, uint32_t, void *, uint32_t) = NULL;
+
+uint8_t statechecklist[256];
+uint32_t currentstate[256];
+uint32_t prevstate[256];
+
+void flush_state_cache(void *device, void *padding, void *alsodevice) {
+	for (int i = 0; i < 256; i++) {
+		if (statechecklist[i] && prevstate[i] != currentstate[i]) {
+			orig_SetRenderState(device, padding, alsodevice, i, currentstate[i]);
+			prevstate[i] = currentstate[i];
+			changecounter++;
+		}
+	}
+}
+
+void restore_state(void *device, void *padding, void *alsodevice) {
+	for (int i = 0; i < 256; i++) {
+		if (statechecklist[i]) {
+			orig_SetRenderState(device, padding, alsodevice, i, currentstate[i]);
+			prevstate[i] = currentstate[i];
+			changecounter++;
+		}
+	}
+}
+
+HRESULT __fastcall SetRenderStateWrapper(uint8_t *device, void *padding, void *alsodevice, uint32_t state, uint32_t value) {
+	//printf("Setting state 0x%08x to 0x%08x!\n", state, value);
+	
+
+	if (state < 255 && !statechecklist[state]) {
+		printf("Setting state %d to 0x%08x!\n", state, value);
+		statechecklist[state] = 1;
+		orig_SetRenderState(device, padding, alsodevice, state, value);
+		return D3D_OK;
+	} else if (state > 255) {
+		printf("!!!!! USED STATE 0x%08x !!!!!\n", state);
+		orig_SetRenderState(device, padding, alsodevice, state, value);
+		return D3D_OK;
+	}
+
+	currentstate[state] = value;
+
+	//orig_SetRenderState(device, padding, alsodevice, state, value);
+
+	return D3D_OK;	// hacky, but it's a released game so they're not going to need to check this
+}
+
+HRESULT __fastcall GetRenderStateWrapper(uint8_t *device, void *padding, void *alsodevice, uint32_t state, uint32_t *value) {
+	if (state < 255 && statechecklist[state]) {
+		*value = currentstate[state];
+
+		return D3D_OK;
+	}
+
+	orig_GetRenderState(device, padding, alsodevice, state, value);
+
+	return D3D_OK;	// hacky, but it's a released game so they're not going to need to check this
+}
+
+HRESULT __fastcall SetTextureStageStateWrapper(uint8_t *device, void *padding, void *alsodevice, uint32_t stage, uint32_t type, uint32_t value) {
+	//printf("Setting texture stage 0x%08x state 0x%08x to 0x%08x!\n", stage, type, value);
+	changecounter++;
+
+	if (stage != 0) {
+		printf("NON 0 STAGE!!!! %d\n", stage);
+	}
+
+	//orig_SetTextureStageState(device, padding, alsodevice, stage, type, value);
+
+	return D3D_OK;	// hacky, but it's a released game so they're not going to need to check this
+}
+
+HRESULT __fastcall PresentWrapper(uint8_t *device, void *padding, void *alsodevice, void *a , void *b, void *c, void *d) {
+	// haha fun name
+	//restore_state(device, padding, alsodevice);
+
+	//printf("%d state changes in frame!\n", changecounter);
+	printf("%d draw calls in frame!\n", drawcounter);
+	changecounter = 0;
+	drawcounter = 0;
+
+	orig_Present(device, padding, alsodevice, a, b, c, d);
+
+	return D3D_OK;	// hacky, but it's a released game so they're not going to need to check this
+}
+
+HRESULT __fastcall BeginSceneWrapper(void *device, void *padding, void *alsodevice) {
+	orig_BeginScene(device, padding, alsodevice);
+
+	restore_state(device, padding, alsodevice);	// when focus is lost, state can get clobbered (possibly for other reasons too?) restore at the start of a frame to avoid that
+
+	return D3D_OK;
+}
+
+HRESULT __fastcall DrawIndexedPrimitiveWrapper(void *device, void *padding, void *alsodevice, uint32_t a, uint32_t b, uint32_t c, uint32_t d, uint32_t e) {
+	//flush_state_cache(device, padding, alsodevice);
+	drawcounter++;
+
+	orig_DrawIndexedPrimitive(device, padding, alsodevice, a, b, c, d, e);
+
+	return D3D_OK;	// hacky, but it's a released game so they're not going to need to check this
+}
+
+HRESULT __fastcall DrawIndexedPrimitiveUPWrapper(void *device, void *padding, void *alsodevice, uint32_t a, uint32_t b, uint32_t c, void *d, uint32_t e, void *f, uint32_t g) {
+	//flush_state_cache(device, padding, alsodevice);
+
+	orig_DrawIndexedPrimitiveUP(device, padding, alsodevice, a, b, c, d, e, f, g);
+
+	return D3D_OK;	// hacky, but it's a released game so they're not going to need to check this
+}
+
+HRESULT __fastcall DrawPrimitiveWrapper(void *device, void *padding, void *alsodevice, uint32_t a, uint32_t b, uint32_t c) {
+	//flush_state_cache(device, padding, alsodevice);
+
+	orig_DrawPrimitive(device, padding, alsodevice, a, b, c);
+
+	return D3D_OK;	// hacky, but it's a released game so they're not going to need to check this
+}
+
+HRESULT __fastcall DrawPrimitiveUPWrapper(void *device, void *padding, void *alsodevice, uint32_t a, uint32_t b, void *c, uint32_t d) {
+	//flush_state_cache(device, padding, alsodevice);
+
+	orig_DrawPrimitiveUP(device, padding, alsodevice, a, b, c, d);
+
+	return D3D_OK;	// hacky, but it's a released game so they're not going to need to check this
+}
+
+HRESULT __fastcall SetStreamSourceWrapper(void *device, void *padding, void *alsodevice, uint32_t streamnumber, void *streamdata, uint32_t stride) {
+
+	return D3D_OK;
+}
+
+void install_device_hooks() {
+	// install hooks to perform better state management
+	printf("Installing D3D8 Device Hooks\n");
+
+	// get device
+	uint8_t *device = **(uint32_t **)0x00aab478;
+	uint32_t *d3dDevice = device;
+
+	//orig_SetRenderState = *(uint32_t *)(device + 0xc8);
+	orig_SetRenderState = *(uint32_t *)(device + 0xc8);
+	orig_GetRenderState = *(uint32_t *)(device + 0xcc);
+	orig_SetTextureStageState = *(uint32_t *)(device + 0xf8);
+	orig_DrawIndexedPrimitive = *(uint32_t *)(device + 0x11c);
+	orig_DrawIndexedPrimitiveUP = *(uint32_t *)(device + 0x124);
+	orig_DrawPrimitive = *(uint32_t *)(device + 0x118);
+	orig_DrawPrimitiveUP = *(uint32_t *)(device + 0x120);
+	orig_Present = *(uint32_t *)(device + 0x3c);
+	orig_BeginScene = *(uint32_t *)(device + 0x88);
+	orig_SetStreamSource = *(uint32_t *)(device + 0x14c);
+
+	patchDWord(device + 0xc8, SetRenderStateWrapper);
+	patchDWord(device + 0xcc, GetRenderStateWrapper);
+	patchDWord(device + 0xf8, SetTextureStageStateWrapper);
+	patchDWord(device + 0x11c, DrawIndexedPrimitiveWrapper);
+	patchDWord(device + 0x124, DrawIndexedPrimitiveUPWrapper);
+	patchDWord(device + 0x118, DrawPrimitiveWrapper);
+	patchDWord(device + 0x120, DrawPrimitiveUPWrapper);
+	patchDWord(device + 0x3c, PresentWrapper);
+	patchDWord(device + 0x88, BeginSceneWrapper);
+	patchDWord(device + 0x14c, SetStreamSourceWrapper);
+
+	for (int i = 0; i < 256; i++) {
+		statechecklist[i] = 0;
+		currentstate[i] = -1;
+		prevstate[i] = -1;
+
+	}
+}
+
+void patch_d3d8_device() {
+	// quick warning: you must install the config patches first as this calls a function where ShowWindow() has been nop'd out
+
+	patchCall(0x0043f392, install_device_hooks);
+}
 
 void patchRenderer() {
 	// remove a big chunk of rendering.  for fun.
 	//patchNop(0x0043dbc2, 37);	// dynamic stuff?  skinned meshes?
-	patchNop(0x0043d6a6, 37);	// world
+	//patchNop(0x0043d6a6, 37);	// world
 
 	//patchNop(0x0043d455, 107 + 6);	// remove world mesh state changes
 
 	//patchNop(0x0043d65b, 60);
 
-	patchNop(0x0043d633, 6);
+	//patchNop(0x0043d633, 6);
 
-	patchNop(0x0043bb15, 55);
+	//patchNop(0x0043bb15, 55);
+
+	//patchNop(0x0043d380, 5);	// call at start of mesh::submit
+	//patchNop(0x0043daea, 33);
+	//patchNop(0x0043db10, 3);
+
+	//patchByte(0x00440d70, 0xc3);	// disable texture setting
+	//patchByte(0x00440da4, 0xeb);	// disable texture setting
+
+	//patchNop(0x0043d453, 115);	// tons of state changes in mesh::submit
+
+	//patch_blend_mode();
+
+	patch_d3d8_device();
 }
 
 void our_random(int out_of) {

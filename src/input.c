@@ -729,13 +729,13 @@ void processEvent(SDL_Event *e) {
 			return;
 		case SDL_WINDOWEVENT:
 			if (e->window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
-				int *isFocused = (int *)0x005a027c;
+				uint8_t *isFocused = (uint8_t *)0x005a027c;
 				*isFocused = 0;
 			} else if (e->window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
-				int *recreateDevice = (int *)0x00aab48e;
+				uint8_t *recreateDevice = (uint8_t *)0x00aab48e;
 				*recreateDevice = 1;
 
-				int *isFocused = (int *)0x005a027c;
+				uint8_t *isFocused = (uint8_t *)0x005a027c;
 				*isFocused = 1;
 			}
 			return;

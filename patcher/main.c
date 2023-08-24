@@ -15,6 +15,14 @@ uint32_t crc32(const void *buf, size_t size);
 int applyPatch(uint8_t *patch, size_t patchLen, uint8_t *input, size_t inputLen, uint8_t **output, size_t *outputLen);
 
 int main(int argc, char **argv) {
+	uint8_t force = 0;
+
+	for (int i = 1; i < argc; i++) {
+		if (strcmp(argv[i], "-f") == 0) {
+			force = 1;
+		}
+	}
+
 	// open executable and dump contents
 	FILE *f = fopen(EXE_NAME, "rb");
 
@@ -34,7 +42,7 @@ int main(int argc, char **argv) {
 			uint32_t inputcrc = crc32(buffer, filesize);
 			if (inputcrc != 0xd2c18c0f && inputcrc != 0xe7af286f) {
 				printf("INPUT CRC DOES NOT MATCH EXPECTED: %08x\n", inputcrc);
-				printf("Patch Failed!\n");
+				//printf("Patch Failed!\n");
 			}
 
 			// patch
@@ -51,9 +59,13 @@ int main(int argc, char **argv) {
 			uint32_t outputcrc = crc32(patchedBuffer, patchedLen);
 			if (outputcrc != 0x528cf068 && outputcrc != 0x3e9468b8) {
 				printf("OUTPUT CRC DOES NOT MATCH EXPECTED: %08x\n", outputcrc);
-				printf("Patch Failed!\n");
+				if (!force) {
+					printf("Patch Failed!\n");
 
-				goto end;
+					goto end;
+				} else {
+					printf("If this works, let PARTY MAN X know the input and output CRCs (or don't.  i'm not the boss of you)\n");
+				}
 			}
 
 			// write to new exe

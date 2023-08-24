@@ -21,8 +21,6 @@ uint32_t *hq_shadows = 0x00aab498;
 uint32_t *fog = 0x00aab490;
 HWND *hwnd = 0x00aab47c;
 
-uint8_t resbuffer[100000];	// buffer needed for high resolutions
-
 uint8_t borderless;
 
 typedef struct {
@@ -91,11 +89,11 @@ void createSDLWindow() {
 		resY = displayMode.h;
 	}
 		
-	if (resX < 640) {
-		resX = 640;
+	if (resX < 320) {
+		resX = 320;
 	}
-	if (resY < 480) {
-		resY = 480;
+	if (resY < 240) {
+		resY = 240;
 	}
 
 	*resolution_setting_x = resX;
@@ -137,8 +135,16 @@ void writeConfigValues() {
 	*fog = graphics_settings.fog;
 }
 
+float fourthreeratio = 4.0f / 3.0f;
+
 float __cdecl getScreenAngleFactor() {
-	return ((float)resX / (float)resY) / (4.0f / 3.0f);
+	float aspect = (float)resX / (float)resY;
+	if (aspect > fourthreeratio) {
+		return aspect / fourthreeratio;
+	} else {
+		// if aspect ratio is less than 4:3, don't reduce horizontal FOV, instead, increase vertical FOV
+		return 1.0f;
+	}
 }
 
 float *screenAspectRatio = 0x00ab4b38;
