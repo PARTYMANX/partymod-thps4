@@ -15,6 +15,8 @@ Features and Fixes:
 - Fixed ledge warp bugs where the skater is teleported down farther than intended
 - Fixed visually incorrect screen flash (I.E. when running into a lion on Zoo)
 - Fixed broken skater friction when autokick was enabled
+- Connects to alternative online services (defaults to OpenSpy)
+- Fixes network interface binding issues (hosting servers works now!)
 - Added a framerate cap to fix logic depending on a framerate of 60hz (long trick point accrual, special meter depreciation, goal logic like SF Manual Rollercoaster)
 - fixes music randomization (introduces entropy *only* for music randomization and consumes the same number of random values to be safe)
 
