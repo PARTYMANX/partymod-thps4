@@ -249,6 +249,21 @@ void patchFrameCap();
 
 uint32_t rng_seed = 0;
 
+
+char domainStr[256];
+char masterServerStr[266];
+
+void patchOnlineService(char *configFile) {
+	GetPrivateProfileString("Miscellaneous", "OnlineDomain", "openspy.net", domainStr, 256, configFile);
+
+	sprintf(masterServerStr, "%%s.master.%s", domainStr);
+	printf("TEST: %s\n", masterServerStr);
+
+	patchDWord(0x00544a1c + 1, masterServerStr);
+
+	printf("Patched online server: %s\n", domainStr);
+}
+
 void initPatch() {
 	GetModuleFileName(NULL, &executableDirectory, filePathBufLen);
 
@@ -301,6 +316,8 @@ void initPatch() {
 		patchFrameCap();
 	}
 
+	patchOnlineService(configFile);
+
 	// get some source of entropy for the music randomizer
 	rng_seed = time(NULL) & 0xffffffff;
 	srand(rng_seed);
@@ -333,7 +350,7 @@ void patchLogicRate() {
 
 void safeWait(uint64_t endTime) {
 	uint64_t timerFreq = SDL_GetPerformanceFrequency();
-	uint64_t safetyThreshold = timerFreq / 1000 * 2;	// 2ms
+	uint64_t safetyThreshold = timerFreq / 1000 * 3;	// 3ms
 
 	uint64_t currentTime = SDL_GetPerformanceCounter();
 
@@ -349,6 +366,7 @@ void safeWait(uint64_t endTime) {
 			//printf("BIG yawn!\n");
 		}
 	}
+	//printf("wait error - %fms - %d\n", ((double)(endTime - currentTime) / (double)timerFreq) / 1000.0, endTime - currentTime);
 }
 
 uint64_t nextFrame = 0;
@@ -359,6 +377,7 @@ void do_frame_cap() {
 	//printf("FREQUENCY: %lld, %lld\n", timerFreq, frameTarget);
 
 	if (!nextFrame || nextFrame < SDL_GetPerformanceCounter()) {
+		//printf("missed frame target!!\n");
 		nextFrame = SDL_GetPerformanceCounter() + frameTarget;
 	} else {
 		safeWait(nextFrame);
@@ -460,6 +479,7 @@ void patch_blend_mode() {
 
 uint32_t changecounter = 0;
 uint32_t drawcounter = 0;
+uint64_t drawprims = 0;
 
 HRESULT(__fastcall *orig_SetRenderState)(void *, void *, void *, uint32_t, uint32_t) = NULL;
 HRESULT(__fastcall *orig_GetRenderState)(void *, void *, void *, uint32_t, uint32_t *) = NULL;
@@ -551,6 +571,7 @@ HRESULT __fastcall PresentWrapper(uint8_t *device, void *padding, void *alsodevi
 	printf("%d draw calls in frame!\n", drawcounter);
 	changecounter = 0;
 	drawcounter = 0;
+	drawprims = 0;
 
 	orig_Present(device, padding, alsodevice, a, b, c, d);
 
@@ -565,11 +586,28 @@ HRESULT __fastcall BeginSceneWrapper(void *device, void *padding, void *alsodevi
 	return D3D_OK;
 }
 
-HRESULT __fastcall DrawIndexedPrimitiveWrapper(void *device, void *padding, void *alsodevice, uint32_t a, uint32_t b, uint32_t c, uint32_t d, uint32_t e) {
+HRESULT __fastcall DrawIndexedPrimitiveWrapper(void *device, void *padding, void *alsodevice, uint32_t prim_type, uint32_t base_idx, uint32_t num_vertices, uint32_t start_idx, uint32_t prim_count) {
 	//flush_state_cache(device, padding, alsodevice);
 	drawcounter++;
+	drawprims += prim_count;
 
-	orig_DrawIndexedPrimitive(device, padding, alsodevice, a, b, c, d, e);
+	orig_DrawIndexedPrimitive(device, padding, alsodevice, prim_type, base_idx, num_vertices, start_idx, prim_count);
+
+	return D3D_OK;	// hacky, but it's a released game so they're not going to need to check this
+}
+
+//0043d6c5
+uint8_t cached_draws = 0;
+
+HRESULT __fastcall DrawIndexedPrimitive_Combine(void *device, void *padding, void *alsodevice, uint32_t prim_type, uint32_t base_idx, uint32_t num_vertices, uint32_t start_idx, uint32_t prim_count) {
+	//flush_state_cache(device, padding, alsodevice);
+	//drawcounter++;
+
+	cached_draws = 1;
+
+	// store draw info here
+
+	//orig_DrawIndexedPrimitive(device, padding, alsodevice, prim_type, base_idx, num_vertices, start_idx, prim_count);
 
 	return D3D_OK;	// hacky, but it's a released game so they're not going to need to check this
 }
@@ -599,6 +637,11 @@ HRESULT __fastcall DrawPrimitiveUPWrapper(void *device, void *padding, void *als
 }
 
 HRESULT __fastcall SetStreamSourceWrapper(void *device, void *padding, void *alsodevice, uint32_t streamnumber, void *streamdata, uint32_t stride) {
+	printf("%d draw calls %d prims for stream! %08x\n", drawcounter, drawprims, streamdata);
+	drawcounter = 0;
+	drawprims = 0;
+
+	orig_SetStreamSource(device, padding, alsodevice, streamnumber, streamdata, stride);
 
 	return D3D_OK;
 }
@@ -648,6 +691,54 @@ void patch_d3d8_device() {
 	patchCall(0x0043f392, install_device_hooks);
 }
 
+void *origCreateDevice = NULL;
+
+int __fastcall createDeviceWrapper(void *id3d8, void *pad, void *id3d8again, uint32_t adapter, uint32_t type, void *hwnd, uint32_t behaviorFlags, uint32_t *presentParams, void *devOut) {
+	int (__fastcall *createDevice)(void *, void *, void *, uint32_t, uint32_t, void *, uint32_t, uint32_t *, void *) = (void *)origCreateDevice;
+
+	presentParams[3] = 1;
+	presentParams[5] = 1;
+	
+	//printf("TEST: %d\n", presentParams[8]);
+
+	
+	//if (presentParams[7]) {	// if windowed
+		presentParams[11] = 0;	// refresh rate
+		presentParams[12] = 0;	// swap interval
+	//} else {
+	//	presentParams[11] = 120;
+	//	presentParams[12] = 1;
+	//}
+	
+
+	int result = createDevice(id3d8, pad, id3d8again, adapter, type, hwnd, behaviorFlags, presentParams, devOut);
+	printf("Created modified d3d device\n");
+
+	//if (result == 0 && devOut) {
+		//uint8_t *device = **(uint32_t **)devOut;
+
+		//origPresent = *(uint32_t *)(device + 0x3c);
+		//patchDWord(device + 0x3c, presentWrapper);
+	//}
+
+	return result;
+}
+
+void * __stdcall createD3D8Wrapper(uint32_t version) {
+	void *(__stdcall *created3d8)(uint32_t) = (void *)0x00546120;
+
+	void *result = created3d8(version);
+
+	if (result) {
+		uint8_t *iface = *(uint32_t *)result;
+
+		origCreateDevice = *(uint32_t *)(iface + 0x3c);
+		patchDWord(iface + 0x3c, createDeviceWrapper);
+	}
+	
+	return result;
+}
+
 void patchRenderer() {
 	// remove a big chunk of rendering.  for fun.
 	//patchNop(0x0043dbc2, 37);	// dynamic stuff?  skinned meshes?
@@ -672,7 +763,15 @@ void patchRenderer() {
 
 	//patch_blend_mode();
 
-	patch_d3d8_device();
+	//patch_d3d8_device();
+
+	patchByte(0x0043f059 + 1, 0x40);	// disable D3D multithreading
+	patchByte(0x0043f11f + 1, 0x40);	// disable D3D multithreading
+	patchByte(0x0043f170 + 1, 0x20);	// disable D3D multithreading
+	patchByte(0x0043f1b2 + 1, 0x40);	// disable D3D multithreading
+	patchByte(0x0043f1de + 1, 0x20);	// disable D3D multithreading
+
+	//patchCall(0x0043efbc, createD3D8Wrapper);
 }
 
 void our_random(int out_of) {
@@ -689,6 +788,11 @@ void patchRandomMusic() {
 	patchCall(0x0042cb74, our_random);
 }
 
+void patchOnlineFixes() {
+	patchNop(0x00544b1c, 2);
+	patchByte(0x0042d4a6, 0xeb);
+}
+
 __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpReserved) {
 	// Perform actions based on the reason for calling.
 	switch(fdwReason) { 
@@ -703,8 +807,9 @@ __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, L
 			patchScriptHook();
 			patchScreenFlash();
 			patchRandomMusic();
+			patchOnlineFixes();
 
-			//patchRenderer();
+			patchRenderer();
 			
 			//patchPrintf();
 			//patchCD();
