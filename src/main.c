@@ -15,7 +15,7 @@
 
 #define VERSION_NUMBER_MAJOR 1
 #define VERSION_NUMBER_MINOR 0
-#define VERSION_NUMBER_FIX 5
+#define VERSION_NUMBER_FIX 6
 
 // FIXME: still broken, not sure why
 double ledgeWarpFix(double n) {
@@ -257,7 +257,7 @@ void patchOnlineService(char *configFile) {
 	GetPrivateProfileString("Miscellaneous", "OnlineDomain", "openspy.net", domainStr, 256, configFile);
 
 	sprintf(masterServerStr, "%%s.master.%s", domainStr);
-	printf("TEST: %s\n", masterServerStr);
+	//printf("TEST: %s\n", masterServerStr);
 
 	patchDWord(0x00544a1c + 1, masterServerStr);
 
@@ -373,7 +373,7 @@ uint64_t nextFrame = 0;
 
 void do_frame_cap() {
 	uint64_t timerFreq = SDL_GetPerformanceFrequency();
-	uint64_t frameTarget = timerFreq / 60;
+	uint64_t frameTarget = (timerFreq / 60);
 	//printf("FREQUENCY: %lld, %lld\n", timerFreq, frameTarget);
 
 	if (!nextFrame || nextFrame < SDL_GetPerformanceCounter()) {
@@ -385,9 +385,24 @@ void do_frame_cap() {
 	}
 }
 
+void endframewrapper() {
+	void (*endframe)() = 0x00461940;
+
+	do_frame_cap();
+
+	endframe();
+}
+
 void patchFrameCap() {
+	// put endscene before present
+	for (uint8_t *i = 0x0042945d; i < 0x0042946b; i++) {
+		patchCopyByte(i - 5, i);
+	}
+	patchCall(0x00429466, 0x00461940);
+
 	patchNop(0x004292a0, 58);	// patch out original, too high framerate cap
 	patchCall(0x004292a0, do_frame_cap);
+	//patchCall(0x00429466, endframewrapper);
 }
 
 struct flashVertex {
@@ -702,13 +717,13 @@ int __fastcall createDeviceWrapper(void *id3d8, void *pad, void *id3d8again, uin
 	//printf("TEST: %d\n", presentParams[8]);
 
 	
-	//if (presentParams[7]) {	// if windowed
+	if (presentParams[7]) {	// if windowed
 		presentParams[11] = 0;	// refresh rate
 		presentParams[12] = 0;	// swap interval
-	//} else {
-	//	presentParams[11] = 120;
-	//	presentParams[12] = 1;
-	//}
+	} else {
+		presentParams[11] = 120;
+		presentParams[12] = 1;
+	}
 	
 
 	int result = createDevice(id3d8, pad, id3d8again, adapter, type, hwnd, behaviorFlags, presentParams, devOut);

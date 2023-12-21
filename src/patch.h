@@ -18,5 +18,6 @@ void patchFloat(void *addr, float val);
 void patchCall(void *addr, void *func);
 void patchThisToCdecl(void *addr, void *func);
 void callFunc(void *addr);
+void patchCopyByte(uint8_t *dst, uint8_t *src);
 
 #endif

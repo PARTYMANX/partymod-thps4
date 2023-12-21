@@ -852,11 +852,31 @@ void __cdecl processController(device *dev) {
 }
 
 void __cdecl set_actuators(device *dev, uint16_t left, uint16_t right) {
-	//printf("SETTING ACTUATORS: %d %d %d\n", dev->port, left, right);
+	dev = ((uint8_t *)dev) - 4;
+	//printf("SETTING ACTUATORS: %d %d %d - %08x %d %d %d\n", dev->port, left, right, &dev->num_actuators, dev->num_actuators, dev->vibrationData_direct[0], dev->vibrationData_direct[1]);
 	for (int i = 0; i < controllerCount; i++) {
 		if (SDL_GameControllerGetAttached(controllerList[i]) && SDL_GameControllerGetPlayerIndex(controllerList[i]) == dev->port) {
 			SDL_JoystickRumble(SDL_GameControllerGetJoystick(controllerList[i]), left, right, 0);
 		}
+	}
+}
+
+void __fastcall activate_actuators(device *dev, void *pad, int idx, int pct) {
+	if (dev->actuatorsDisabled) {
+		return;
+	}
+
+	//printf("ACTIVATING ACTUATOR: %d, %d\n", idx, pct);
+
+	if (dev->state == 2 && (dev->capabilities & 2) && idx >= 0 && idx < dev->num_actuators) {
+		float str = ((float)pct * 0.01f) * dev->vibrationData_max[idx];
+		dev->vibrationData_direct[idx] = str;
+
+		uint16_t left = ((uint16_t)dev->vibrationData_direct[0]) << 8;
+		uint16_t right = ((uint16_t)dev->vibrationData_direct[1]) << 8;
+
+		set_actuators(((uint8_t *)dev) + 4, left, right);
+
 	}
 }
 
@@ -1017,4 +1037,7 @@ void patchInput() {
 	// handle events while unfocused
 	patchCall(0x0042921f, processEventsUnfocused);
 	patchCall(0x0042a612, processEventsUnfocused);
+
+	patchCall(0x00541fe0, activate_actuators);
+	patchByte(0x00541fe0, 0xe9);	// patch CALL to JMP
 }

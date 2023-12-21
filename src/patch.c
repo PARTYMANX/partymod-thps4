@@ -76,3 +76,16 @@ void callFunc(void *addr) {
     void (*fp)() = addr;
     fp();
 }
+
+void patchCopyByte(uint8_t *dst, uint8_t *src) {
+    DWORD oldProtectDst;
+    DWORD oldProtectSrc;
+
+    VirtualProtect(dst, 1, PAGE_EXECUTE_READWRITE, &oldProtectDst);
+    VirtualProtect(src, 1, PAGE_EXECUTE_READWRITE, &oldProtectSrc);
+
+    *dst = *src;
+
+    VirtualProtect(dst, 1, oldProtectDst, &oldProtectDst);
+    VirtualProtect(src, 1, oldProtectSrc, &oldProtectSrc);
+}
