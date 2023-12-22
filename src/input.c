@@ -851,12 +851,12 @@ void __cdecl processController(device *dev) {
 	}
 }
 
-void __cdecl set_actuators(device *dev, uint16_t left, uint16_t right) {
+void __cdecl set_actuators(device *dev, uint16_t high, uint16_t low) {
 	dev = ((uint8_t *)dev) - 4;
 	//printf("SETTING ACTUATORS: %d %d %d - %08x %d %d %d\n", dev->port, left, right, &dev->num_actuators, dev->num_actuators, dev->vibrationData_direct[0], dev->vibrationData_direct[1]);
 	for (int i = 0; i < controllerCount; i++) {
 		if (SDL_GameControllerGetAttached(controllerList[i]) && SDL_GameControllerGetPlayerIndex(controllerList[i]) == dev->port) {
-			SDL_JoystickRumble(SDL_GameControllerGetJoystick(controllerList[i]), left, right, 0);
+			SDL_JoystickRumble(SDL_GameControllerGetJoystick(controllerList[i]), low, high, 0);
 		}
 	}
 }
@@ -872,10 +872,10 @@ void __fastcall activate_actuators(device *dev, void *pad, int idx, int pct) {
 		float str = ((float)pct * 0.01f) * dev->vibrationData_max[idx];
 		dev->vibrationData_direct[idx] = str;
 
-		uint16_t left = ((uint16_t)dev->vibrationData_direct[0]) << 8;
-		uint16_t right = ((uint16_t)dev->vibrationData_direct[1]) << 8;
+		uint16_t high = ((uint16_t)dev->vibrationData_direct[0]) << 8;
+		uint16_t low = ((uint16_t)dev->vibrationData_direct[1]) << 8;
 
-		set_actuators(((uint8_t *)dev) + 4, left, right);
+		set_actuators(((uint8_t *)dev) + 4, high, low);
 
 	}
 }
