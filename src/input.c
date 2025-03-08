@@ -350,7 +350,7 @@ uint8_t getKey(SDL_Scancode key) {
 
 	uint8_t *keyboardState = SDL_GetKeyboardState(NULL);
 
-	if (menu_on_screen) {
+	if (*menu_on_screen) {
 		// if a menu is on screen, ignore menu binds
 		if (key == SDL_SCANCODE_RETURN || key == SDL_SCANCODE_ESCAPE || key == SDL_SCANCODE_UP || key == SDL_SCANCODE_DOWN || key == SDL_SCANCODE_LEFT || key == SDL_SCANCODE_RIGHT) {
 			return 0;
