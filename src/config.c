@@ -218,6 +218,7 @@ void loadInputSettings(struct inputsettings *settingsOut) {
 	if (settingsOut) {
 		settingsOut->isPs2Controls = getIniBool("Miscellaneous", "UsePS2Controls", 1, configFile);
 		settingsOut->dropdownEnabled = getIniBool("Miscellaneous", "EnablePCDropdown", 1, configFile);
+		settingsOut->useKeyboardControls = getIniBool("Miscellaneous", "UseKeyboardControls", 1, configFile);
 	}
 }
 

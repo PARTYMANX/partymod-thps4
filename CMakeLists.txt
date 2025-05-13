@@ -13,6 +13,8 @@ set(SOURCE_FILES
 	"${SRC}/hash.c"
 	"${SRC}/script.c"
 	"${SRC}/patches.c"
+	"${SRC}/gfx.c"
+	"${SRC}/gfx_buffers.c"
 )
 
 set(HEADER_FILES
@@ -22,6 +24,7 @@ set(HEADER_FILES
 	"${SRC}/input.h"
 	"${SRC}/hash.h"
 	"${SRC}/script.h"
+	"${SRC}/gfx.h"
 )
 
 list(APPEND INCLUDES ${THIRDPARTY})

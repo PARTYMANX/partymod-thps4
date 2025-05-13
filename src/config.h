@@ -97,6 +97,7 @@ struct controllerbinds {
 struct inputsettings {
 	uint8_t isPs2Controls;
 	uint8_t dropdownEnabled;
+	uint8_t useKeyboardControls;
 };
 
 void loadInputSettings(struct inputsettings *settingsOut);

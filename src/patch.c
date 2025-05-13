@@ -30,17 +30,17 @@ void patchByte(void* addr, uint8_t val) {
 void patchDWord(void *addr, uint32_t val) {
     DWORD oldProtect;
 
-    VirtualProtect(addr, 1, PAGE_EXECUTE_READWRITE, &oldProtect);
+    VirtualProtect(addr, 4, PAGE_EXECUTE_READWRITE, &oldProtect);
     *(uint32_t *)addr = val;
-    VirtualProtect(addr, 1, oldProtect, &oldProtect);
+    VirtualProtect(addr, 4, oldProtect, &oldProtect);
 }
 
 void patchFloat(void *addr, float val) {
     DWORD oldProtect;
 
-    VirtualProtect(addr, 1, PAGE_EXECUTE_READWRITE, &oldProtect);
+    VirtualProtect(addr, 4, PAGE_EXECUTE_READWRITE, &oldProtect);
     *(float *)addr = val;
-    VirtualProtect(addr, 1, oldProtect, &oldProtect);
+    VirtualProtect(addr, 4, oldProtect, &oldProtect);
 }
 
 void patchCall(void *addr, void *func) {

@@ -236,6 +236,11 @@ void getStick(SDL_GameController *controller, controllerStick stick, uint8_t *xO
 	}
 }
 
+uint8_t* addr_isKeyboardOnScreen = 0x00ab5bae;
+uint8_t *addr_isMenuOnScreen = 0x00ab5bac;
+
+uint8_t isInMenu = 0;
+
 void pollController(device *dev, SDL_GameController *controller) {
 	if (SDL_GameControllerGetAttached(controller)) {
 		dev->isValid = 1;
@@ -345,115 +350,282 @@ void pollController(device *dev, SDL_GameController *controller) {
 	}
 }
 
-uint8_t getKey(SDL_Scancode key) {
-	uint8_t *menu_on_screen = 0x00ab5bac;
+uint8_t prev_in_menu = 0;
+uint8_t prev_in_keyboard = 0;
 
-	uint8_t *keyboardState = SDL_GetKeyboardState(NULL);
+#define LOCKOUT 2
+struct menuKeys {
+	uint8_t affirmative;	// a/x
+	uint8_t negative;	// b/circle
+	uint8_t	menu;	// x/square
+	uint8_t extra;	// y/triangle
+	uint8_t up;
+	uint8_t down;
+	uint8_t left;
+	uint8_t right;
+	uint8_t rot_left;	// lb/l1
+	uint8_t rot_right;	// rb/r1
+	uint8_t zoom;	// black (also r2, but that's rerouted to black)
+	// not handling graphic editor transforms now, it is too likely to interfere with desired menu binds
+	/*
+	uint8_t transform_rot_left;	// cam left
+	uint8_t transform_rot_right;	// cam right
+	uint8_t transform_scale_up;	// cam up
+	uint8_t transform_scale_down;	// cam down
+	*/
+};
 
-	if (*menu_on_screen) {
-		// if a menu is on screen, ignore menu binds
-		if (key == SDL_SCANCODE_RETURN || key == SDL_SCANCODE_ESCAPE || key == SDL_SCANCODE_UP || key == SDL_SCANCODE_DOWN || key == SDL_SCANCODE_LEFT || key == SDL_SCANCODE_RIGHT) {
-			return 0;
-		}
-	}
+struct menuKeys menuKeyStates;
 
-	return keyboardState[key];
+void initMenuKeyStates() {
+	memset(&menuKeyStates, 0, sizeof(struct menuKeys));
 }
 
-void pollKeyboard(device *dev) {
+void processMenuBinds(uint8_t *keyStates) {
+	if (!inputsettings.useKeyboardControls) {
+		return;
+	}
+
+	// if menu state is changing 
+	//printf("keyboard_on_screen: %d, prev: %d\n", *addr_isKeyboardOnScreen, prev_in_keyboard);
+	if (isInMenu != prev_in_menu || *addr_isKeyboardOnScreen != prev_in_keyboard) {
+		if (keybinds.ollie != SDL_SCANCODE_RETURN && menuKeyStates.affirmative == 1) {
+			menuKeyStates.affirmative = LOCKOUT;
+		}
+		if (keybinds.grab != SDL_SCANCODE_ESCAPE && menuKeyStates.negative == 1) {
+			menuKeyStates.negative = LOCKOUT;
+		}
+		if (keybinds.kick != SDL_SCANCODE_E && menuKeyStates.menu == 1) {
+			menuKeyStates.menu = LOCKOUT;
+		}
+		if (keybinds.grind != SDL_SCANCODE_R && menuKeyStates.extra == 1) {
+			menuKeyStates.extra = LOCKOUT;
+		}
+		if (keybinds.up != SDL_SCANCODE_UP && menuKeyStates.up == 1) {
+			menuKeyStates.up = LOCKOUT;
+		}
+		if (keybinds.down != SDL_SCANCODE_DOWN && menuKeyStates.down == 1) {
+			menuKeyStates.down = LOCKOUT;
+		}
+		if (keybinds.left != SDL_SCANCODE_LEFT && menuKeyStates.left == 1) {
+			menuKeyStates.left = LOCKOUT;
+		}
+		if (keybinds.right != SDL_SCANCODE_RIGHT && menuKeyStates.right == 1) {
+			menuKeyStates.right = LOCKOUT;
+		}
+		if (inputsettings.isPs2Controls) {
+			if (keybinds.leftSpin != SDL_SCANCODE_1 && menuKeyStates.rot_left == 1) {
+				menuKeyStates.rot_left = LOCKOUT;
+			}
+			if (keybinds.rightSpin != SDL_SCANCODE_2 && menuKeyStates.rot_right == 1) {
+				menuKeyStates.rot_right = LOCKOUT;
+			}
+			if (keybinds.switchRevert != SDL_SCANCODE_MINUS && menuKeyStates.zoom == 1) {
+				menuKeyStates.zoom = LOCKOUT;
+			}
+		}
+		else {
+			if (keybinds.nollie != SDL_SCANCODE_1 && menuKeyStates.rot_left == 1) {
+				menuKeyStates.rot_left = LOCKOUT;
+			}
+			if (keybinds.switchRevert != SDL_SCANCODE_2 && menuKeyStates.rot_right == 1) {
+				menuKeyStates.rot_right = LOCKOUT;
+			}
+			if (keybinds.rightSpin != SDL_SCANCODE_MINUS && menuKeyStates.zoom == 1) {
+				menuKeyStates.zoom = LOCKOUT;
+			}
+		}
+
+		prev_in_menu = isInMenu;
+		prev_in_keyboard = *addr_isKeyboardOnScreen;
+	}
+
+	// process keys, clear lockout for any keys that are up
+	if (!(menuKeyStates.affirmative == LOCKOUT && keyStates[SDL_SCANCODE_RETURN])) {
+		menuKeyStates.affirmative = keyStates[SDL_SCANCODE_RETURN];
+	}
+	if (!(menuKeyStates.negative == LOCKOUT && keyStates[SDL_SCANCODE_ESCAPE])) {
+		menuKeyStates.negative = keyStates[SDL_SCANCODE_ESCAPE];
+	}
+	if (!(menuKeyStates.menu == LOCKOUT && keyStates[SDL_SCANCODE_E])) {
+		menuKeyStates.menu = keyStates[SDL_SCANCODE_E];
+	}
+	if (!(menuKeyStates.extra == LOCKOUT && keyStates[SDL_SCANCODE_R])) {
+		menuKeyStates.extra = keyStates[SDL_SCANCODE_R];
+	}
+	if (!(menuKeyStates.up == LOCKOUT && keyStates[SDL_SCANCODE_UP])) {
+		menuKeyStates.up = keyStates[SDL_SCANCODE_UP];
+	}
+	if (!(menuKeyStates.down == LOCKOUT && keyStates[SDL_SCANCODE_DOWN])) {
+		menuKeyStates.down = keyStates[SDL_SCANCODE_DOWN];
+	}
+	if (!(menuKeyStates.left == LOCKOUT && keyStates[SDL_SCANCODE_LEFT])) {
+		menuKeyStates.left = keyStates[SDL_SCANCODE_LEFT];
+	}
+	if (!(menuKeyStates.right == LOCKOUT && keyStates[SDL_SCANCODE_RIGHT])) {
+		menuKeyStates.right = keyStates[SDL_SCANCODE_RIGHT];
+	}
+	if (!(menuKeyStates.rot_left == LOCKOUT && keyStates[SDL_SCANCODE_1])) {
+		menuKeyStates.rot_left = keyStates[SDL_SCANCODE_1];
+	}
+	if (!(menuKeyStates.rot_right == LOCKOUT && keyStates[SDL_SCANCODE_2])) {
+		menuKeyStates.rot_right = keyStates[SDL_SCANCODE_2];
+	}
+	if (!(menuKeyStates.zoom == LOCKOUT && keyStates[SDL_SCANCODE_MINUS])) {
+		menuKeyStates.zoom = keyStates[SDL_SCANCODE_MINUS];
+	}
+}
+
+uint8_t getKeyState(uint8_t *keyStates, uint8_t key) {
+	switch (key) {
+	case SDL_SCANCODE_RETURN:
+		return menuKeyStates.affirmative != LOCKOUT && (!isInMenu && keyStates[key]);
+	case SDL_SCANCODE_ESCAPE:
+		return menuKeyStates.negative != LOCKOUT && (!isInMenu && keyStates[key]);
+	case SDL_SCANCODE_E:
+		return menuKeyStates.menu != LOCKOUT && (!isInMenu && keyStates[key]);
+	case SDL_SCANCODE_R:
+		return menuKeyStates.extra != LOCKOUT && (!isInMenu && keyStates[key]);
+	case SDL_SCANCODE_UP:
+		return menuKeyStates.up != LOCKOUT && (!isInMenu && keyStates[key]);
+	case SDL_SCANCODE_DOWN:
+		return menuKeyStates.down != LOCKOUT && (!isInMenu && keyStates[key]);
+	case SDL_SCANCODE_LEFT:
+		return menuKeyStates.left != LOCKOUT && (!isInMenu && keyStates[key]);
+	case SDL_SCANCODE_RIGHT:
+		return menuKeyStates.right != LOCKOUT && (!isInMenu && keyStates[key]);
+	case SDL_SCANCODE_1:
+		return menuKeyStates.rot_left != LOCKOUT && (!isInMenu && keyStates[key]);
+	case SDL_SCANCODE_2:
+		return menuKeyStates.rot_right != LOCKOUT && (!isInMenu && keyStates[key]);
+	case SDL_SCANCODE_MINUS:
+		return menuKeyStates.zoom != LOCKOUT && (!isInMenu && keyStates[key]);
+	default:
+		return keyStates[key];
+	}
+}
+
+void pollKeyboard(device* dev) {
 	dev->isValid = 1;
 	dev->isPluggedIn = 1;
 
-	uint8_t *keyboardState = SDL_GetKeyboardState(NULL);
+	uint8_t* keyboardState = SDL_GetKeyboardState(NULL);
+
+	processMenuBinds(keyboardState);
+
+	if (*addr_isKeyboardOnScreen && inputsettings.useKeyboardControls) {
+		return;
+	}
 
 	// buttons
-	if (getKey(keybinds.menu)) {
+	if (getKeyState(keyboardState, keybinds.menu)) {
 		dev->controlData[2] |= 0x01 << 3;
 	}
-	if (getKey(keybinds.cameraToggle)) {
+	if (getKeyState(keyboardState, keybinds.cameraToggle)) {
 		dev->controlData[2] |= 0x01 << 0;
 	}
-	/*if (getKey(keybinds.focus]) {	// no control for left stick on keyboard
-		dev->controlData[2] |= 0x01 << 1;
-	}*/
-	if (getKey(keybinds.cameraSwivelLock)) {
+	if (getKeyState(keyboardState, keybinds.cameraSwivelLock)) {
 		dev->controlData[2] |= 0x01 << 2;
 	}
 
-	if (getKey(keybinds.grind)) {
+	if (getKeyState(keyboardState, keybinds.grind) || (isInMenu && menuKeyStates.extra == 1)) {
 		dev->controlData[3] |= 0x01 << 4;
 		dev->controlData[12] = 0xff;
 	}
-	if (getKey(keybinds.grab)) {
+	if (getKeyState(keyboardState, keybinds.grab) || (isInMenu && menuKeyStates.negative == 1)) {
 		dev->controlData[3] |= 0x01 << 5;
 		dev->controlData[13] = 0xff;
 	}
-	if (getKey(keybinds.ollie)) {
+	if (getKeyState(keyboardState, keybinds.ollie) || (isInMenu && menuKeyStates.affirmative == 1)) {
 		dev->controlData[3] |= 0x01 << 6;
 		dev->controlData[14] = 0xff;
 	}
-	if (getKey(keybinds.kick)) {
+	if (getKeyState(keyboardState, keybinds.kick) || (isInMenu && menuKeyStates.menu == 1)) {
 		dev->controlData[3] |= 0x01 << 7;
 		dev->controlData[15] = 0xff;
 	}
 
 	// shoulders
 	if (inputsettings.isPs2Controls) {
-		if (getKey(keybinds.leftSpin)) {
+		if (getKeyState(keyboardState, keybinds.leftSpin) || (isInMenu && menuKeyStates.rot_left == 1)) {
 			dev->controlData[3] |= 0x01 << 2;
 			dev->controlData[16] = 0xff;
 		}
-		if (getKey(keybinds.rightSpin)) {
+		if (getKeyState(keyboardState, keybinds.rightSpin) || (isInMenu && menuKeyStates.rot_right == 1)) {
 			dev->controlData[3] |= 0x01 << 3;
 			dev->controlData[17] = 0xff;
 		}
-		if (getKey(keybinds.nollie)) {
+		if (getKeyState(keyboardState, keybinds.nollie)) {
 			dev->controlData[3] |= 0x01 << 0;
 			dev->controlData[18] = 0xff;
+			if (isInMenu) {
+				dev->controlData[20] |= 0x01 << 1;	// act as white when in menu
+			}
 		}
-		if (getKey(keybinds.switchRevert)) {
+		if (getKeyState(keyboardState, keybinds.switchRevert) || (isInMenu && menuKeyStates.zoom == 1)) {
 			dev->controlData[3] |= 0x01 << 1;
 			dev->controlData[19] = 0xff;
-		}
-	} else {
-		if (getKey(keybinds.leftSpin)) {
-			dev->controlData[3] |= 0x01 << 2;
-			dev->controlData[16] = 0xff;
-			dev->controlData[3] |= 0x01 << 0;
-			dev->controlData[18] = 0xff;
-		}
-		if (getKey(keybinds.rightSpin)) {
-			dev->controlData[3] |= 0x01 << 3;
-			dev->controlData[17] = 0xff;
-			dev->controlData[3] |= 0x01 << 1;
-			dev->controlData[19] = 0xff;
-		}
-		if (getKey(keybinds.switchRevert)) {
-			dev->controlData[3] |= 0x01 << 3;
-			dev->controlData[17] = 0xff;
-			dev->controlData[3] |= 0x01 << 1;
-			dev->controlData[19] = 0xff;
-			dev->controlData[3] |= 0x01 << 2;
-			dev->controlData[16] = 0xff;
-			dev->controlData[3] |= 0x01 << 0;
-			dev->controlData[18] = 0xff;
+			if (isInMenu) {
+				dev->controlData[20] |= 0x01 << 0;	// act as black when in menu
+			}
 		}
 	}
-		
+	else {
+		if (!(*addr_isKeyboardOnScreen)) {
+			// when editing a park, right trigger acts as l1
+			if (getKeyState(keyboardState, keybinds.switchRevert)) {
+				dev->controlData[3] |= 0x01 << 2;
+				dev->controlData[16] = 0xff;
+			}
+
+			if (getKeyState(keyboardState, keybinds.nollie)) {
+				dev->controlData[3] |= 0x01 << 0;
+				dev->controlData[18] = 0xff;
+			}
+
+			if (getKeyState(keyboardState, keybinds.leftSpin)) {
+				dev->controlData[20] |= 0x01 << 1;
+			}
+			if (getKeyState(keyboardState, keybinds.rightSpin)) {
+				dev->controlData[20] |= 0x01 << 0;
+			}
+		}
+		else {
+			if (getKeyState(keyboardState, keybinds.nollie) || (isInMenu && menuKeyStates.rot_left == 1)) {
+				dev->controlData[3] |= 0x01 << 2;
+				dev->controlData[16] = 0xff;
+				dev->controlData[3] |= 0x01 << 0;
+				dev->controlData[18] = 0xff;
+			}
+			if (getKeyState(keyboardState, keybinds.switchRevert) || (isInMenu && menuKeyStates.rot_right == 1)) {
+				dev->controlData[3] |= 0x01 << 3;
+				dev->controlData[17] = 0xff;
+				dev->controlData[3] |= 0x01 << 1;
+				dev->controlData[19] = 0xff;
+			}
+			if (getKeyState(keyboardState, keybinds.leftSpin)) {
+				dev->controlData[20] |= 0x01 << 1;
+			}
+			if (getKeyState(keyboardState, keybinds.rightSpin) || (isInMenu && menuKeyStates.zoom == 1)) {
+				dev->controlData[20] |= 0x01 << 0;
+			}
+		}
+	}
+
 	// d-pad
-	if (getKey(keybinds.item_up)) {
+	if (getKeyState(keyboardState, keybinds.item_up) || (isInMenu && menuKeyStates.up == 1)) {
 		dev->controlData[2] |= 0x01 << 4;
 		dev->controlData[10] = 0xFF;
 	}
-	if (getKey(keybinds.item_right)) {
+	if (getKeyState(keyboardState, keybinds.item_right) || (isInMenu && menuKeyStates.right == 1)) {
 		dev->controlData[2] |= 0x01 << 5;
 		dev->controlData[8] = 0xFF;
 	}
-	if (getKey(keybinds.item_down)) {
+	if (getKeyState(keyboardState, keybinds.item_down) || (isInMenu && menuKeyStates.down == 1)) {
 		dev->controlData[2] |= 0x01 << 6;
 		dev->controlData[11] = 0xFF;
 	}
-	if (getKey(keybinds.item_left)) {
+	if (getKeyState(keyboardState, keybinds.item_left) || (isInMenu && menuKeyStates.left == 1)) {
 		dev->controlData[2] |= 0x01 << 7;
 		dev->controlData[9] = 0xFF;
 	}
@@ -461,35 +633,35 @@ void pollKeyboard(device *dev) {
 	// sticks - NOTE: because these keys are very rarely used/important, SOCD handling is just to cancel
 	// right
 	// x
-	if (getKey(keybinds.cameraLeft) && !getKey(keybinds.cameraRight)) {
+	if (getKeyState(keyboardState, keybinds.cameraLeft) && !getKeyState(keyboardState, keybinds.cameraRight)) {
 		dev->controlData[4] = 0;
 	}
-	if (getKey(keybinds.cameraRight) && !getKey(keybinds.cameraLeft)) {
+	if (getKeyState(keyboardState, keybinds.cameraRight) && !getKeyState(keyboardState, keybinds.cameraLeft)) {
 		dev->controlData[4] = 255;
 	}
 
 	// y
-	if (getKey(keybinds.cameraUp) && !getKey(keybinds.cameraDown)) {
+	if (getKeyState(keyboardState, keybinds.cameraUp) && !getKeyState(keyboardState, keybinds.cameraDown)) {
 		dev->controlData[5] = 0;
 	}
-	if (getKey(keybinds.cameraDown) && !getKey(keybinds.cameraUp)) {
+	if (getKeyState(keyboardState, keybinds.cameraDown) && !getKeyState(keyboardState, keybinds.cameraUp)) {
 		dev->controlData[5] = 255;
 	}
 
 	// left
 	// x
-	if (getKey(keybinds.left) && !getKey(keybinds.right)) {
+	if (getKeyState(keyboardState, keybinds.left) && !getKeyState(keyboardState, keybinds.right)) {
 		dev->controlData[6] = 0;
 	}
-	if (getKey(keybinds.right) && !getKey(keybinds.left)) {
+	if (getKeyState(keyboardState, keybinds.right) && !getKeyState(keyboardState, keybinds.left)) {
 		dev->controlData[6] = 255;
 	}
 
 	// y
-	if (getKey(keybinds.up) && !getKey(keybinds.down)) {
+	if (getKeyState(keyboardState, keybinds.up) && !getKeyState(keyboardState, keybinds.down)) {
 		dev->controlData[7] = 0;
 	}
-	if (getKey(keybinds.down) && !getKey(keybinds.up)) {
+	if (getKeyState(keyboardState, keybinds.down) && !getKeyState(keyboardState, keybinds.up)) {
 		dev->controlData[7] = 255;
 	}
 }
@@ -504,11 +676,15 @@ uint8_t isKeyboardTyping() {
 void do_key_input(SDL_KeyCode key) {
 	void (*key_input)(int32_t key, uint32_t param) = (void *)0x005426c0;
 	void (*key_input_arrow)(int32_t key, uint32_t param) = (void *)0x00542730;
-	uint8_t *keyboard_on_screen = 0x00ab5bac;
+	//uint8_t *keyboard_on_screen = 0x00ab5bac;
 
 	//if (!*keyboard_on_screen) {
 	//	return;
 	//}
+
+	if (!inputsettings.useKeyboardControls) {
+		return;
+	}
 
 	int32_t key_out = 0;
 	uint8_t modstate = SDL_GetModState();
@@ -536,146 +712,59 @@ void do_key_input(SDL_KeyCode key) {
 		return;
 	}
 
-	if (key == SDLK_RETURN) {
-		key_out = 0x0d;	// CR
-	} else if (key == SDLK_BACKSPACE) {
-		key_out = 0x08;	// BS
-	} else if (key == SDLK_ESCAPE) {
-		key_out = 0x1b;	// ESC
-	} else if (key == SDLK_SPACE) {
-		key_out = ' ';
-	} else if (key >= SDLK_0 && key <= SDLK_9 && !(modstate & KMOD_SHIFT)) {
-		key_out = key;
-	} else if (key >= SDLK_a && key <= SDLK_z) {
-		key_out = key;
-		if (modstate & (KMOD_SHIFT | KMOD_CAPS)) {
-			key_out -= 0x20;
+	if (!*addr_isKeyboardOnScreen && !isInMenu) {
+		if (key == SDLK_RETURN) {
+			key_input(0x19, 0);
 		}
-	} else if (key == SDLK_PERIOD) {
-		if (modstate & KMOD_SHIFT) {
-			key_out = '>';
-		} else {
-			key_out = '.';
+		else if (key == SDLK_F1) {
+			key_input(0x1f, 0);
 		}
-	} else if (key == SDLK_COMMA) {
-		if (modstate & KMOD_SHIFT) {
-			key_out = '<';
-		} else {
-			key_out = ',';
+		else if (key == SDLK_F2) {
+			key_input(0x1c, 0);
 		}
-	} else if (key == SDLK_SLASH) {
-		if (modstate & KMOD_SHIFT) {
-			key_out = '?';
-		} else {
-			key_out = '/';
+		else if (key == SDLK_F3) {
+			key_input(0x1d, 0);
 		}
-	} else if (key == SDLK_SEMICOLON) {
-		if (modstate & KMOD_SHIFT) {
-			key_out = ':';
-		} else {
-			key_out = ';';
+		else if (key == SDLK_F4) {
+			key_input(0x1e, 0);
 		}
-	} else if (key == SDLK_QUOTE) {
-		if (modstate & KMOD_SHIFT) {
-			key_out = '\"';
-		} else {
-			key_out = '\'';
-		}
-	} else if (key == SDLK_LEFTBRACKET) {
-		if (modstate & KMOD_SHIFT) {
-			key_out = '{';
-		} else {
-			key_out = '[';
-		}
-	} else if (key == SDLK_RIGHTBRACKET) {
-		if (modstate & KMOD_SHIFT) {
-			key_out = '}';
-		} else {
-			key_out = ']';
-		}
-	} else if (key == SDLK_BACKSLASH) {
-		if (modstate & KMOD_SHIFT) {
-			key_out = '|';
-		} else {
-			key_out = '\\';
-		}
-	} else if (key == SDLK_MINUS) {
-		if (modstate & KMOD_SHIFT) {
-			key_out = '_';
-		} else {
-			key_out = '-';
-		}
-	} else if (key == SDLK_EQUALS) {
-		if (modstate & KMOD_SHIFT) {
-			key_out = '+';
-		} else {
-			key_out = '=';
-		}
-	} else if (key == SDLK_BACKQUOTE) {
-		if (modstate & KMOD_SHIFT) {
-			key_out = '~';
-		} else {
-			key_out = '`';
-		}
-	} else if (key == SDLK_1 && modstate & KMOD_SHIFT) {
-		key_out = '!';
-	} else if (key == SDLK_2 && modstate & KMOD_SHIFT) {
-		key_out = '@';
-	} else if (key == SDLK_3 && modstate & KMOD_SHIFT) {
-		key_out = '#';
-	} else if (key == SDLK_4 && modstate & KMOD_SHIFT) {
-		key_out = '$';
-	} else if (key == SDLK_5 && modstate & KMOD_SHIFT) {
-		key_out = '%';
-	} else if (key == SDLK_6 && modstate & KMOD_SHIFT) {
-		key_out = '^';
-	} else if (key == SDLK_7 && modstate & KMOD_SHIFT) {
-		key_out = '&';
-	} else if (key == SDLK_8 && modstate & KMOD_SHIFT) {
-		key_out = '*';
-	} else if (key == SDLK_9 && modstate & KMOD_SHIFT) {
-		key_out = '(';
-	} else if (key == SDLK_0 && modstate & KMOD_SHIFT) {
-		key_out = ')';
-	} else if (key == SDLK_KP_0) {
-		key_out = '0';
-	} else if (key == SDLK_KP_1) {
-		key_out = '1';
-	} else if (key == SDLK_KP_2) {
-		key_out = '2';
-	} else if (key == SDLK_KP_3) {
-		key_out = '3';
-	} else if (key == SDLK_KP_4) {
-		key_out = '4';
-	} else if (key == SDLK_KP_5) {
-		key_out = '5';
-	} else if (key == SDLK_KP_6) {
-		key_out = '6';
-	} else if (key == SDLK_KP_7) {
-		key_out = '7';
-	} else if (key == SDLK_KP_8) {
-		key_out = '8';
-	} else if (key == SDLK_KP_9) {
-		key_out = '9';
-	} else if (key == SDLK_KP_MINUS) {
-		key_out = '-';
-	} else if (key == SDLK_KP_EQUALS) {
-		key_out = '=';
-	} else if (key == SDLK_KP_PLUS) {
-		key_out = '+';
-	} else if (key == SDLK_KP_DIVIDE) {
-		key_out = '/';
-	} else if (key == SDLK_KP_MULTIPLY) {
-		key_out = '*';
-	} else if (key == SDLK_KP_DECIMAL) {
-		key_out = '.';
-	} else if (key == SDLK_KP_ENTER) {
-		key_out = 0x0d;
-	} else {
-		key_out = -1;
+
+		return;
 	}
 
-	key_input(key_out, 0);
+	if (*addr_isKeyboardOnScreen) {
+		if (key == SDLK_RETURN && menuKeyStates.affirmative != LOCKOUT) {
+			key_out = 0x0d;	// CR
+		}
+		else if (key == SDLK_BACKSPACE) {
+			key_out = 0x08;	// BS
+		}
+		else if (key == SDLK_ESCAPE && menuKeyStates.negative != LOCKOUT) {
+			key_out = 0x1b;	// ESC
+		}
+		else if (key == SDLK_KP_ENTER && menuKeyStates.affirmative != LOCKOUT) {
+			key_out = 0x0d;
+		}
+		else {
+			key_out = -1;
+		}
+
+		if (key_out != -1) {
+			key_input(key_out, 0);
+		}
+	}
+}
+
+void do_text_input(char* text) {
+	void (*key_input)(int32_t key, uint32_t param) = (void*)0x005426c0;
+	if (*addr_isKeyboardOnScreen && inputsettings.useKeyboardControls) {
+		if (strlen(text) == 1) {
+			key_input(text[0], 0);
+		}
+		else {
+			printf("Input text '%s' > 1 byte!!\n");
+		}
+	}
 }
 
 void processEvent(SDL_Event *e) {
@@ -727,6 +816,9 @@ void processEvent(SDL_Event *e) {
 		case SDL_CONTROLLERAXISMOTION:
 			setUsingKeyboard(0);
 			return;
+		case SDL_TEXTINPUT:
+			do_text_input(e->text.text);
+			return;
 		case SDL_WINDOWEVENT:
 			if (e->window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
 				uint8_t *isFocused = (uint8_t *)0x005a027c;
@@ -762,6 +854,10 @@ void __cdecl processController(device *dev) {
 	// cheating:
 	// replace type with index
 	//dev->type = 60;
+	uint8_t *otherIsInMenu = 0x00ab752d;
+	//printf("F: 0x%02x, D: 0x%02x\n", *test1, *test2);
+
+	isInMenu = (*addr_isMenuOnScreen || *otherIsInMenu) && inputsettings.useKeyboardControls;
 
 	//printf("IS KEYBOARD ON SCREEN: %d\n", isKeyboardTyping());
 	//printf("Processing Controller %d %d %d!\n", dev->index, dev->slot, dev->port);
@@ -823,9 +919,7 @@ void __cdecl processController(device *dev) {
 		dev->isValid = 1;
 		dev->isPluggedIn = 1;
 
-		if (!isKeyboardTyping()) {
-			pollKeyboard(dev);
-		}
+		pollKeyboard(dev);
 	}
 	
 	if (dev->port < MAX_PLAYERS) {
