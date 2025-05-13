@@ -874,6 +874,7 @@ struct settings {
 	int ps2_controls;
 	int dropdown_pc;
 	int disable_physics_fixes;
+	int keyboard_controls;
 };
 
 struct keybinds {
@@ -1035,6 +1036,7 @@ void defaultSettings() {
 	settings.ps2_controls = 1;
 	settings.dropdown_pc = 1;
 	settings.disable_physics_fixes = 0;
+	settings.keyboard_controls = 1;
 
 	keybinds.ollie = SDL_SCANCODE_KP_2;
 	keybinds.grab = SDL_SCANCODE_KP_6;
@@ -1120,6 +1122,7 @@ void loadSettings() {
 	settings.ps2_controls = getIniBool("Miscellaneous", "UsePS2Controls", 1, configFile);
 	settings.dropdown_pc = getIniBool("Miscellaneous", "EnablePCDropdown", 1, configFile);
 	settings.disable_physics_fixes = getIniBool("Miscellaneous", "DisablePhysicsFixes", 0, configFile);
+	settings.keyboard_controls = getIniBool("Miscellaneous", "UseKeyboardControls", 1, configFile);
 
 	keybinds.ollie = GetPrivateProfileInt("Keybinds", "Ollie", SDL_SCANCODE_KP_2, configFile);
 	keybinds.grab = GetPrivateProfileInt("Keybinds", "Grab", SDL_SCANCODE_KP_6, configFile);
@@ -1194,6 +1197,7 @@ void saveSettings() {
 	writeIniBool("Miscellaneous", "UsePS2Controls", settings.ps2_controls, configFile);
 	writeIniBool("Miscellaneous", "EnablePCDropdown", settings.dropdown_pc, configFile);
 	writeIniBool("Miscellaneous", "DisablePhysicsFixes", settings.disable_physics_fixes, configFile);
+	writeIniBool("Miscellaneous", "UseKeyboardControls", settings.keyboard_controls, configFile);
 
 	writeIniInt("Keybinds", "Ollie", keybinds.ollie, configFile);
 	writeIniInt("Keybinds", "Grab", keybinds.grab, configFile);
@@ -1779,6 +1783,7 @@ struct general_page {
 	pgui_control *ps2_controls;
 	pgui_control *dropdown_pc;
 	pgui_control *disable_physics_fixes;
+	pgui_control *keyboard_controls;
 };
 
 struct general_page general_page;
@@ -1862,8 +1867,9 @@ void build_general_page(pgui_control *parent) {
 
 	// miscellaneous options
 	general_page.ps2_controls = pgui_checkbox_create(8, 16, 128, 24, "Use PS2 Controls", misc_groupbox);
-	general_page.dropdown_pc = pgui_checkbox_create(8, 16 + 24, 128, 24, "Enable PC Dropdown*", misc_groupbox);
-	general_page.disable_physics_fixes = pgui_checkbox_create(8, 16 + (24 * 2), 128, 24, "Disable Physics Fixes**", misc_groupbox);
+	general_page.dropdown_pc = pgui_checkbox_create(8, 16 + 20, 128, 24, "Enable PC Dropdown*", misc_groupbox);
+	general_page.disable_physics_fixes = pgui_checkbox_create(8, 16 + (20 * 2), 128, 24, "Disable Physics Fixes**", misc_groupbox);
+	general_page.keyboard_controls = pgui_checkbox_create(8, 16 + (20 * 3), 150, 24, "Keyboard Menu Controls", misc_groupbox);
 	pgui_label_create(8, misc_groupbox->h - 8 - 64, 160, 32, "*Dropdown always enabled with PS2 controls", PGUI_LABEL_JUSTIFY_LEFT, misc_groupbox);
 	pgui_label_create(8, misc_groupbox->h - 8 - 32, 160, 32, "**For speedrunning. Restores ledge warps and broken friction.", PGUI_LABEL_JUSTIFY_LEFT, misc_groupbox);
 
@@ -1878,6 +1884,7 @@ void build_general_page(pgui_control *parent) {
 	pgui_checkbox_set_on_toggle(general_page.ps2_controls, do_setting_checkbox, &(settings.ps2_controls));
 	pgui_checkbox_set_on_toggle(general_page.dropdown_pc, do_setting_checkbox, &(settings.dropdown_pc));
 	pgui_checkbox_set_on_toggle(general_page.disable_physics_fixes, do_setting_checkbox, &(settings.disable_physics_fixes));
+	pgui_checkbox_set_on_toggle(general_page.keyboard_controls, do_setting_checkbox, &(settings.keyboard_controls));
 
 	pgui_combobox_set_on_select(general_page.resolution_combobox, set_display_mode, NULL);
 	pgui_checkbox_set_on_toggle(general_page.custom_resolution, check_custom_resolution, NULL);
@@ -1943,6 +1950,7 @@ void update_general_page() {
 	pgui_checkbox_set_checked(general_page.ps2_controls, settings.ps2_controls);
 	pgui_checkbox_set_checked(general_page.dropdown_pc, settings.dropdown_pc);
 	pgui_checkbox_set_checked(general_page.disable_physics_fixes, settings.disable_physics_fixes);
+	pgui_checkbox_set_checked(general_page.keyboard_controls, settings.keyboard_controls);
 }
 
 void callback_ok(pgui_control *control, void *data) {
