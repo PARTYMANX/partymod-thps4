@@ -88,9 +88,27 @@ void patchAnisotropicFilter() {
 	patchCall(0x0043d6f6, SetTextureStageStateWrapper_SetAnisotropy);
 }
 
+void renderWorldWrapper() {
+	void (*renderWorld)() = 0x00461950;
+	renderWorld();
+
+	uint32_t *conv_x_offset = 0x00a72a04;
+	uint32_t *conv_y_offset = 0x00a72a08;
+	float *conv_x_multiplier = 0x00a729fc;
+	float *conv_y_multiplier = 0x00a72a00;
+	uint32_t *backbuffer_width = 0x00a729f0;
+	uint32_t *backbuffer_height = 0x00a729f4;
+
+	*conv_x_multiplier = (float)(*backbuffer_width) / 704.0f;
+	*conv_y_multiplier = (float)(*backbuffer_height) / 448.0f;
+	*conv_x_offset = 0;
+	*conv_x_offset = 32 * *conv_x_multiplier;
+	*conv_y_offset = 16 * *conv_y_multiplier;
+	*conv_y_offset = 0;
+}
+
 void patchUIPositioning() {
-	patchDWord(0x0043f2d0 + 6, 0);
-	patchFloat(0x00589868, 1.0f / 640.0f);
+	patchCall(0x0042944e, renderWorldWrapper);
 }
 
 struct movieVertex {
