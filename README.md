@@ -2,6 +2,10 @@
 This is a patch for THPS4 to improve its input handling as well as smooth out a few other parts of the PC port.
 The patch is designed to keep the game as original as possible, and leave its files unmodified.
 
+## 🎉 PARTYMOD 🎉
+PARTYMOD is a series of patches that provide various fixes and modernizations for the THPS series and other games on their engines.
+[Other PARTYMOD Releases Available Here](https://partymod.newnet.city/)
+
 ### Features and Fixes
 * Replaced input system entirely with new, modern system using the SDL2 library
 * Added option to use original PS2-style control binds (Note: when not using PS2 controls, nollie and spin left are joined as well as switch and spin right, switch is bound to spine transfer which is just nollie+switch)
