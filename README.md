@@ -6,7 +6,7 @@ The patch is designed to keep the game as original as possible, and leave its fi
 PARTYMOD is a series of patches that provide various fixes and modernizations for the THPS series and other games on their engines.
 [Other PARTYMOD Releases Available Here](https://partymod.newnet.city/)
 
-### Features and Fixes
+## Features and Fixes
 * Replaced input system entirely with new, modern system using the SDL2 library
 * Added option to use original PS2-style control binds (Note: when not using PS2 controls, nollie and spin left are joined as well as switch and spin right, switch is bound to spine transfer which is just nollie+switch)
 * Controller vibration now more consistently works with controllers
@@ -23,7 +23,7 @@ PARTYMOD is a series of patches that provide various fixes and modernizations fo
 * Added a framerate cap to fix logic depending on a framerate of 60hz (long trick point accrual, special meter depreciation, goal logic like SF Manual Rollercoaster)
 * fixes music randomization (introduces entropy *only* for music randomization and consumes the same number of random values to be safe)
 
-### Installation
+## Installation
 1. Download PARTYMOD from the releases tab
 2. Make sure THPS4 (English) is installed, remove the widescreen mod if it is installed (delete dinput8.dll)
 3. Extract this zip folder into your THPS4 installation directory
@@ -35,7 +35,7 @@ NOTE: if the game is installed into the "Program Files" directory, you may need 
 Also, if the game is installed into the "Program Files" directory, save files will be saved in the C:\Users\<name>\AppData\Local\VirtualStore directory.  
 For more information, see here: https://answers.microsoft.com/en-us/windows/forum/all/please-explain-virtualstore-for-non-experts/d8912f80-b275-48d7-9ff3-9e9878954227
 
-### Building
+## Building
 The build requires CMake and SDL2 (I install it via vspkg).  Create the project file like so from the partymod-thps3/build directory:
 ```
 cmake .. -A win32 -DCMAKE_TOOLCHAIN_FILE=C:/[vcpkg directory]/scripts/buildsystems/vcpkg.cmake
