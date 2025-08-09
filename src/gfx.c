@@ -163,7 +163,16 @@ void patchMovieBlackBars() {
 }
 
 void patchVertexBufferCreation() {
+	// change all index buffers to D3DPOOL_MANAGED, make them non-dynamic
 	patchByte(0x0043e2e7 + 1, 0x01);	// change mesh index buffer pool to D3DPOOL_MANAGED
+	//patchByte(0x0043e016 + 1, 0x01);
+	//patchByte(0x00444341 + 1, 0x01);
+	//patchByte(0x0044444c + 1, 0x01);
+
+	// remove D3DUSAGE_DYNAMIC flag from index buffer usage
+	//patchDWord(0x0043e01c + 1, 0);	
 	patchDWord(0x0043e2f9 + 1, 0);	// remove D3DUSAGE_DYNAMIC flag from index buffer usage
+	//patchDWord(0x00444347 + 1, 0);
+	//patchDWord(0x00444452 + 1, 0);
 }
 

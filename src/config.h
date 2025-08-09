@@ -104,6 +104,7 @@ void loadInputSettings(struct inputsettings *settingsOut);
 void loadControllerBinds(struct controllerbinds *bindsOut);
 void loadKeyBinds(struct keybinds *bindsOut);
 int getIniBool(char *section, char *key, int def, char *file);
+void getOptimalRefreshRate(uint32_t* freq, uint32_t* interval);
 
 void patchLoadConfig();
 void dumpSettings();

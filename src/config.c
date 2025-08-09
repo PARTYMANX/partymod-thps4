@@ -64,6 +64,32 @@ void enforceMaxResolution() {
 	}
 }
 
+void getOptimalRefreshRate(uint32_t *freq, uint32_t *interval) {
+	DEVMODE deviceMode;
+	int i = 0;
+
+	*freq = 0;
+	*interval = 0;
+
+	while (EnumDisplaySettings(NULL, i, &deviceMode)) {
+		if (deviceMode.dmPelsWidth == resX && deviceMode.dmPelsHeight == resY) {
+			printf("MODE: %dx%d %dhz\n", deviceMode.dmPelsWidth, deviceMode.dmPelsHeight, deviceMode.dmDisplayFrequency);
+			if (deviceMode.dmDisplayFrequency > *freq && ((deviceMode.dmDisplayFrequency % 60) == 0 || (*freq % 60) != 0)) {
+				*freq = deviceMode.dmDisplayFrequency;
+				if ((*freq % 60) == 0) {
+					*interval = *freq / 60;
+				} else {
+					*interval = 0;
+				}
+
+				printf("USING DISPLAY MODE %d, %d\n", *freq, *interval);
+			}
+		}
+
+		i++;
+	}
+}
+
 void loadSettings();
 
 void createSDLWindow() {

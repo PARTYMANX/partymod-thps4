@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include <patch.h>
+#include <config.h>
 
 // big, unused patch for rendering stuff, was trying to fix performance but made it worse lol
 
@@ -308,7 +309,10 @@ int __fastcall createDeviceWrapper(void* id3d8, void* pad, void* id3d8again, uin
 		presentParams[12] = 0;	// swap interval
 	}
 	else {
-		presentParams[11] = 60;
+		uint32_t freq, interval;
+		getOptimalRefreshRate(&freq, &interval);
+		printf("REFRESH: %d, SWAP INTERVAL: %d\n", presentParams[11], presentParams[12]);
+		presentParams[11] = freq;
 		presentParams[12] = 1;
 	}
 
@@ -377,5 +381,5 @@ void patchRenderer() {
 	patchByte(0x0043f1b2 + 1, 0x40);	// disable D3D multithreading
 	patchByte(0x0043f1de + 1, 0x20);	// disable D3D multithreading
 
-	//patchCall(0x0043efbc, createD3D8Wrapper);
+	patchCall(0x0043efbc, createD3D8Wrapper);
 }
