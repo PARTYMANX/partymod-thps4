@@ -21,7 +21,9 @@ PARTYMOD is a series of patches that provide various fixes and modernizations fo
 * Fixes network interface binding issues (hosting servers works now!)
 * Fixed broken skater friction when autokick was enabled
 * Added a framerate cap to fix logic depending on a framerate of 60hz (long trick point accrual, special meter depreciation, goal logic like SF Manual Rollercoaster)
+* Uses VSync by default to prevent screen tearing
 * fixes music randomization (introduces entropy *only* for music randomization and consumes the same number of random values to be safe)
+* increases graffiti mode combo tag limit from 32 to 512 (NOTE: if connected to a server without this patch, exceeding 32 tags will crash the server.  not great but what can y'do)
 
 ## Installation
 1. Download PARTYMOD from the releases tab
