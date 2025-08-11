@@ -71,10 +71,17 @@ void getOptimalRefreshRate(uint32_t *freq, uint32_t *interval) {
 	*freq = 0;
 	*interval = 0;
 
+	// don't exceed current refresh rate (in case an invalid refresh rate is presented)
+	DEVMODE currentMode;
+	uint32_t max_freq = 0;
+	if (EnumDisplaySettings(NULL, ENUM_CURRENT_SETTINGS, &currentMode)) {
+		max_freq = currentMode.dmDisplayFrequency;
+	}
+
 	while (EnumDisplaySettings(NULL, i, &deviceMode)) {
 		if (deviceMode.dmPelsWidth == resX && deviceMode.dmPelsHeight == resY) {
 			printf("MODE: %dx%d %dhz\n", deviceMode.dmPelsWidth, deviceMode.dmPelsHeight, deviceMode.dmDisplayFrequency);
-			if (deviceMode.dmDisplayFrequency > *freq && ((deviceMode.dmDisplayFrequency % 60) == 0 || (*freq % 60) != 0)) {
+			if (deviceMode.dmDisplayFrequency > *freq && ((deviceMode.dmDisplayFrequency % 60) == 0 || (*freq % 60) != 0) && (deviceMode.dmDisplayFrequency <= max_freq)) {
 				*freq = deviceMode.dmDisplayFrequency;
 				if ((*freq % 60) == 0) {
 					*interval = *freq / 60;

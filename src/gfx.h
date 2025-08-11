@@ -8,5 +8,6 @@ void patchDisableGamma();
 void patchNoGrass();
 void patchMovieBlackBars();
 void patchVertexBufferCreation();
+void patchVSync();
 
 #endif

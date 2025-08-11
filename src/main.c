@@ -16,7 +16,7 @@
 
 #define VERSION_NUMBER_MAJOR 1
 #define VERSION_NUMBER_MINOR 0
-#define VERSION_NUMBER_FIX 9
+#define VERSION_NUMBER_FIX 10
 
 // FIXME: still broken, not sure why
 double ledgeWarpFix(double n) {
@@ -322,6 +322,11 @@ void initPatch() {
 		patchNoGrass();
 	}
 
+	int disableVSync = getIniBool("Graphics", "DisableVSync", 0, configFile);
+	if (!disableVSync) {
+		patchVSync();
+	}
+
 	patchOnlineService(configFile);
 
 	// get some source of entropy for the music randomizer
@@ -476,12 +481,14 @@ void patchSelectShift() {
 	this patch raises the number of objects that can be tricked on in one combo 
 	for graffiti mode from 32 to 512.  this should fit every level in the game
 
-	i'm not sure the safety of running this online.  i think it should fail 
-	gracefully with the server only recognizing 32 tags, but I'm not certain
+	if this is run online as a client, the server will crash when given more 
+	than 32 trick objects.  as a server, the patch runs perfectly, clients get 
+	large numbers of trick objects without issue
 
 	the way this works is that the patch replaces the usual pending tricks 
 	object with a pointer to the extended one.  every function that deals with 
-	that class is wrapped to dereference the pointer first
+	that class is wrapped to dereference the pointer first and also deal with a
+	larger buffer
 */
 
 #define MAX_PENDING_TRICKS 512
@@ -494,35 +501,23 @@ struct FixedPendingTricks {
 void __fastcall CPendingTricks_CPendingTricks_Wrapper(struct FixedPendingTricks **pending_tricks) {
 	void (__fastcall * CPendingTricks_CPendingTricks)(struct FixedPendingTricks *) = (void *)0x004e0dc0;
 
-	//printf("CPendingTricks::CPendingTricks!\n");
-
 	*pending_tricks = malloc(sizeof(struct FixedPendingTricks));
 
 	(*pending_tricks)->trick_count = 0;
-	
-	//CPendingTricks_CPendingTricks(*pending_tricks);
 }
 
 uint8_t __fastcall CPendingTricks_FlushTricks_Wrapper(struct FixedPendingTricks **pending_tricks) {
 	uint8_t (__fastcall * CPendingTricks_FlushTricks)(struct FixedPendingTricks *) = (void *)0x004e0f90;
 
-	//printf("CPendingTricks::FlushTricks!\n");
-
 	(*pending_tricks)->trick_count = 0;
 
 	return 1;
-	//return CPendingTricks_FlushTricks(*pending_tricks);
 }
 
 uint32_t lastcount = 0;
 
 uint32_t __fastcall CPendingTricks_TrickOffObject_Wrapper(struct FixedPendingTricks **pending_tricks, void *pad, uint32_t obj) {
 	uint32_t (__fastcall * CPendingTricks_TrickOffObject)(struct FixedPendingTricks *, void *, uint32_t) = (void *)0x004e0dd0;
-
-	/*if ((*pending_tricks)->trick_count != lastcount) {
-		printf("CPendingTricks::TrickOffObject! %d tricks!\n", (*pending_tricks)->trick_count);
-		lastcount = (*pending_tricks)->trick_count;
-	}*/
 
 	if ((*pending_tricks)->trick_count > MAX_PENDING_TRICKS) {
 		(*pending_tricks)->trick_count = MAX_PENDING_TRICKS;
@@ -534,15 +529,11 @@ uint32_t __fastcall CPendingTricks_TrickOffObject_Wrapper(struct FixedPendingTri
 uint32_t __fastcall CPendingTricks_WriteToBuffer_Wrapper(struct FixedPendingTricks **pending_tricks, void *pad, uint32_t *buf, uint32_t size) {
 	uint32_t (__fastcall * CPendingTricks_WriteToBuffer)(struct FixedPendingTricks *, void *, uint32_t *, uint32_t) = (void *)0x004e0e90;
 
-	//printf("CPendingTricks::WriteToBuffer for %d tricks!\n", (*pending_tricks)->trick_count);
-
 	if ((*pending_tricks)->trick_count > MAX_PENDING_TRICKS) {
 		(*pending_tricks)->trick_count = MAX_PENDING_TRICKS;
 	}
 
 	uint32_t result = CPendingTricks_WriteToBuffer(*pending_tricks, pad, buf, size);
-
-	//printf("CPendingTricks::WriteToBuffer wrote %d bytes (max %d bytes)!\n", result, size);
 
 	return result;
 }
@@ -552,17 +543,11 @@ void __fastcall CGoalManager_Land_Graffiti(void* goal_manager) {
 	uint32_t (__fastcall * CSkater_GetScoreObject)(uint32_t) = (void*)0x004b77c0;
 	void (__fastcall * CGoalManager_GotTrickObject)(void *, void *, uint32_t, uint32_t) = (void*)0x004eb620;
 
-	//printf("CGoalManager::Land graffiti\n");
-
-	// convert pending tricks to the original, limited version
-	//printf("CGoalManager::Land: Calling GetLocalSkater!\n");
 	uint32_t *skate_instance = (uint32_t *)0x00ab5b48;
 	uint32_t local_skater = Skate_GetLocalSkater(*skate_instance);
 	uint32_t pScore = CSkater_GetScoreObject(local_skater);
 	uint32_t last_score_landed = *((uint32_t *)(pScore + 0x18));
 	struct FixedPendingTricks** pending_tricks = (struct FixedPendingTricks**)(local_skater + 0x6f0);
-
-	//printf("CGoalManager::Land graffiti: processing %d tricks with score %d!\n", (*pending_tricks)->trick_count, last_score_landed);
 
 	for (int i = 0; i < (*pending_tricks)->trick_count; i++) {
 		CGoalManager_GotTrickObject(goal_manager, NULL, (*pending_tricks)->checksums[i], last_score_landed);
@@ -571,8 +556,6 @@ void __fastcall CGoalManager_Land_Graffiti(void* goal_manager) {
 
 void __fastcall Score_LogTrickObject_Wrapper(void *pScore, void *pad, uint32_t skater_id, uint32_t score, uint32_t trick_count, uint32_t* pending_tricks, uint8_t propagate) {
 	void (__fastcall * Score_LogTrickObject)(void *, void *, uint32_t, uint32_t, uint32_t, struct FixedPendingTricks**, uint8_t) = (void*)0x004f70d0;
-
-	//printf("Score::LogTrickObject: %d!\n", trick_count);
 
 	Score_LogTrickObject(pScore, pad, skater_id, score, trick_count, pending_tricks, propagate);
 }
@@ -613,9 +596,11 @@ void patchTagLimit() {
 	// adjust trick count offset
 	patchDWord(0x004e0e99 + 2, MAX_PENDING_TRICKS * sizeof(uint32_t));
 
-	// CGoalManager::Land
+	// CGoalManager::Land - replace the graffiti branch with our own logic
 	patchNop(0x004edc88, 85);
-	patchCall(0x004f5d30, CGoalManager_Land_Graffiti);
+	patchByte(0x004edc88, 0x8b);	// eax to ecx
+	patchByte(0x004edc88 + 1, 0xcb);	// eax to ecx
+	patchCall(0x004edc88 + 2, CGoalManager_Land_Graffiti);
 
 	// Score::LogTrickObjectRequest
 	patchDWord(0x004f7010 + 2, (MAX_PENDING_TRICKS * sizeof(uint32_t)) + 0x10);	// expand stack to fit new message
@@ -647,7 +632,6 @@ void patchTagLimit() {
 	patchDWord(0x004f7424 + 3, ((MAX_PENDING_TRICKS * sizeof(uint32_t)) * 2) + 0x68);
 	patchDWord(0x004f742b + 3, ((MAX_PENDING_TRICKS * sizeof(uint32_t)) * 2) + 0x70);
 	patchDWord(0x004f7438 + 3, ((MAX_PENDING_TRICKS * sizeof(uint32_t)) * 2) + 0x74);
-	//patchDWord(0x004f710f + 3, ((MAX_PENDING_TRICKS * sizeof(uint32_t)) * 2) + 0x60);
 
 	patchDWord(0x004f73aa + 3, (0xdc - 0x80) + (MAX_PENDING_TRICKS * sizeof(uint32_t)));
 	patchDWord(0x004f7365 + 3, (0xd8 - 0x80) + (MAX_PENDING_TRICKS * sizeof(uint32_t)));

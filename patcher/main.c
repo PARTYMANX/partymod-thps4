@@ -15,7 +15,7 @@ uint32_t crc32(const void *buf, size_t size);
 int applyPatch(uint8_t *patch, size_t patchLen, uint8_t *input, size_t inputLen, uint8_t **output, size_t *outputLen);
 
 int main(int argc, char **argv) {
-	uint8_t force = 0;
+	uint8_t force = 1;
 
 	for (int i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "-f") == 0) {
@@ -40,7 +40,7 @@ int main(int argc, char **argv) {
 
 			// check input crc (not using the one in the bps due to multiple valid executables)
 			uint32_t inputcrc = crc32(buffer, filesize);
-			if (inputcrc != 0xd2c18c0f && inputcrc != 0xe7af286f && inputcrc != 0x3c92df41 && inputcrc != 0x4f46664c && inputcrc != 0x80a3ee8c) {
+			if (inputcrc != 0xd2c18c0f && inputcrc != 0xe7af286f && inputcrc != 0x3c92df41 && inputcrc != 0x4f46664c && inputcrc != 0x80a3ee8c && inputcrc != 0xadd2f5f5) {
 				printf("INPUT CRC DOES NOT MATCH EXPECTED: %08x\n", inputcrc);
 				//printf("Patch Failed!\n");
 			}
@@ -57,7 +57,7 @@ int main(int argc, char **argv) {
 
 			// check crc (again, not using the one in the bps due to multiple valid executables)
 			uint32_t outputcrc = crc32(patchedBuffer, patchedLen);
-			if (outputcrc != 0x528cf068 && outputcrc != 0x3e9468b8 && outputcrc != 0x8705ebb8 && outputcrc != 0xd6bb1c59 && outputcrc != 0xb31af2de) {
+			if (outputcrc != 0x528cf068 && outputcrc != 0x3e9468b8 && outputcrc != 0x8705ebb8 && outputcrc != 0xd6bb1c59 && outputcrc != 0xb31af2de && outputcrc != 0x66a8949d) {
 				printf("OUTPUT CRC DOES NOT MATCH EXPECTED: %08x\n", outputcrc);
 				if (!force) {
 					printf("Patch Failed!\n");

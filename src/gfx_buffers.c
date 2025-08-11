@@ -6,6 +6,8 @@
 #include <patch.h>
 #include <config.h>
 
+// this file is poorly named!  check the bottom for actually relevant stuff
+
 // big, unused patch for rendering stuff, was trying to fix performance but made it worse lol
 
 void* oldresult = NULL;
@@ -295,6 +297,9 @@ void patch_d3d8_device() {
 
 void* origCreateDevice = NULL;
 
+int config_vsync_mode = 0;
+
+// wrapper for createDevice that selects the optimal mode for vsync
 int __fastcall createDeviceWrapper(void* id3d8, void* pad, void* id3d8again, uint32_t adapter, uint32_t type, void* hwnd, uint32_t behaviorFlags, uint32_t* presentParams, void** devOut) {
 	int(__fastcall * createDevice)(void*, void*, void*, uint32_t, uint32_t, void*, uint32_t, uint32_t*, void*) = (void*)origCreateDevice;
 
@@ -309,16 +314,32 @@ int __fastcall createDeviceWrapper(void* id3d8, void* pad, void* id3d8again, uin
 		presentParams[12] = 0;	// swap interval
 	}
 	else {
-		uint32_t freq, interval;
-		getOptimalRefreshRate(&freq, &interval);
-		printf("REFRESH: %d, SWAP INTERVAL: %d\n", presentParams[11], presentParams[12]);
-		presentParams[11] = freq;
+		presentParams[11] = 0;
 		presentParams[12] = 1;
+
+		/*uint32_t freq = 0;
+		uint32_t interval = 0;
+
+		if (config_vsync_mode == 2) {
+			getOptimalRefreshRate(&freq, &interval);
+
+			// TODO: test unsupported resolutions
+			presentParams[11] = freq;
+			presentParams[12] = interval;
+
+			printf("REFRESH: %d, SWAP INTERVAL: %d\n", presentParams[11], presentParams[12]);
+		} else if (config_vsync_mode == 1) {
+			presentParams[11] = 0;
+			presentParams[12] = 1;
+		} else {
+			presentParams[11] = 0;
+			presentParams[12] = 0;
+		}*/
 	}
 
 
 	int result = createDevice(id3d8, pad, id3d8again, adapter, type, hwnd, behaviorFlags, presentParams, devOut);
-	printf("Created modified d3d device\n");
+	//printf("Created modified d3d device\n");
 
 	//if (result == 0 && devOut) {
 		//uint8_t *device = **(uint32_t **)devOut;
@@ -345,8 +366,6 @@ void* __stdcall createD3D8Wrapper(uint32_t version) {
 	}
 
 	return result;
-
-
 }
 
 void patchRenderer() {
@@ -380,6 +399,8 @@ void patchRenderer() {
 	patchByte(0x0043f170 + 1, 0x20);	// disable D3D multithreading
 	patchByte(0x0043f1b2 + 1, 0x40);	// disable D3D multithreading
 	patchByte(0x0043f1de + 1, 0x20);	// disable D3D multithreading
+}
 
+void patchVSync() {
 	patchCall(0x0043efbc, createD3D8Wrapper);
 }
