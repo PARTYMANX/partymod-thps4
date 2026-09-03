@@ -611,6 +611,9 @@ void patchTagLimit() {
 	// Score::LogTrickObject
 	patchDWord(0x004f70e5 + 2, ((MAX_PENDING_TRICKS * sizeof(uint32_t)) * 2) + 0x48);	// expand stack to fit new message
 	patchDWord(0x004f7469 + 2, ((MAX_PENDING_TRICKS * sizeof(uint32_t)) * 2) + 0x54);	// stack pointer add
+	// the next two commented because it makes tags extremely flaky. no idea why
+	//patchDWord(0x004f7308 + 1, MAX_PENDING_TRICKS * sizeof(uint32_t));	// fix size of color change message sent to players
+	//patchDWord(0x004f73b1 + 1, MAX_PENDING_TRICKS * sizeof(uint32_t));	// fix size of color change message sent to observers
 	// fix stack pointers
 	patchDWord(0x004f7457 + 3, ((MAX_PENDING_TRICKS * sizeof(uint32_t)) * 2) + 0x58);	// fix exception list
 	patchDWord(0x004f710f + 3, ((MAX_PENDING_TRICKS * sizeof(uint32_t)) * 2) + 0x60);
